@@ -1,0 +1,78 @@
+@startuml CollectPro_CasUtilisation
+
+title CollectPro - Diagramme de cas d'utilisation
+
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Administrateur" as Admin
+actor "Superviseur" as Sup
+actor "Agent terrain" as Agent
+
+Sup --|> Agent
+' Le superviseur hérite des droits de base de l'agent (consultation)
+
+rectangle "CollectPro" {
+
+  ' ---- Authentification (commun) ----
+  usecase "S'authentifier" as UC_Auth
+
+  ' ---- Administrateur ----
+  usecase "Gérer les organisations" as UC_Org
+  usecase "Créer un compte utilisateur" as UC_CreateUser
+  usecase "Gérer les rôles et permissions" as UC_Roles
+  usecase "Affecter les agents aux superviseurs" as UC_Affect
+  usecase "Administrer la plateforme (dashboard)" as UC_Admin
+  usecase "Consulter toutes les collectes" as UC_ConsultAllCollectes
+  usecase "Gérer les formulaires" as UC_Forms
+  usecase "Suivre l'activité globale" as UC_Suivi
+
+  ' ---- Superviseur ----
+  usecase "Consulter les agents de son équipe" as UC_ConsultAgents
+  usecase "Suivre l'avancement des missions" as UC_SuiviMissions
+  usecase "Consulter les collectes de l'équipe" as UC_ConsultCollectesEquipe
+  usecase "Valider une collecte" as UC_Valider
+  usecase "Rejeter une collecte" as UC_Rejeter
+  usecase "Ajouter un commentaire de rejet" as UC_Commentaire
+
+  ' ---- Agent ----
+  usecase "Consulter les missions attribuées" as UC_Missions
+  usecase "Remplir un formulaire de collecte" as UC_Formulaire
+  usecase "Ajouter photos / documents" as UC_Photos
+  usecase "Capturer la position GPS" as UC_GPS
+  usecase "Sauvegarder une collecte hors connexion" as UC_SaveOffline
+  usecase "Synchroniser les données" as UC_Sync
+}
+
+Admin --> UC_Auth
+Sup --> UC_Auth
+Agent --> UC_Auth
+
+Admin --> UC_Org
+Admin --> UC_CreateUser
+Admin --> UC_Roles
+Admin --> UC_Affect
+Admin --> UC_Admin
+Admin --> UC_ConsultAllCollectes
+Admin --> UC_Forms
+Admin --> UC_Suivi
+
+Sup --> UC_ConsultAgents
+Sup --> UC_SuiviMissions
+Sup --> UC_ConsultCollectesEquipe
+Sup --> UC_Valider
+Sup --> UC_Rejeter
+
+Agent --> UC_Missions
+Agent --> UC_Formulaire
+Agent --> UC_Photos
+Agent --> UC_GPS
+Agent --> UC_SaveOffline
+Agent --> UC_Sync
+
+UC_Rejeter ..> UC_Commentaire : <<include>>
+UC_Formulaire ..> UC_Photos : <<extend>>
+UC_Formulaire ..> UC_GPS : <<extend>>
+UC_SaveOffline ..> UC_Sync : <<extend>>
+
+@enduml

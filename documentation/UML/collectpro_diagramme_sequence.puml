@@ -1,0 +1,82 @@
+@startuml CollectPro_DiagrammeSequence
+
+title CollectPro - Séquence : Collecte, Synchronisation et Validation
+
+actor "Agent" as Agent
+participant "App Flutter" as App
+database "SQLite (Drift)" as SQLite
+participant "API REST\n(Spring Boot)" as API
+database "PostgreSQL" as DB
+actor "Superviseur" as Sup
+participant "Dashboard Angular" as Dash
+
+== 1. Création d'une collecte (hors connexion) ==
+
+Agent -> App : Remplir formulaire de collecte
+App -> App : Capturer position GPS
+App -> App : Ajouter photos / documents
+App -> SQLite : Sauvegarder collecte (status = DRAFT)
+SQLite --> App : Confirmation sauvegarde locale
+App -> SQLite : Mettre à jour status = PENDING_SYNC
+App --> Agent : Collecte enregistrée localement
+
+== 2. Synchronisation automatique (retour de connexion) ==
+
+App -> App : Détecter connexion Internet
+App -> SQLite : Récupérer collectes PENDING_SYNC
+SQLite --> App : Liste des collectes en attente
+
+loop pour chaque collecte en attente
+    App -> SQLite : Mettre à jour status = SYNCING
+    App -> API : POST /collectes (dataJson, GPS, photos)
+    activate API
+
+    API -> API : Valider les données reçues
+
+    alt données valides
+        API -> DB : INSERT collecte (status = PENDING_VALIDATION)
+        DB --> API : Confirmation
+        API -> DB : INSERT sync_log (status = SUCCESS)
+        API --> App : 200 OK (collecteId, status)
+        App -> SQLite : Mettre à jour status = SYNCED
+    else données invalides / erreur réseau
+        API --> App : 400/500 Erreur
+        App -> SQLite : Mettre à jour status = ERROR
+        App -> SQLite : INSERT sync_log local (error_message)
+    end
+
+    deactivate API
+end
+
+App --> Agent : Notification fin de synchronisation
+
+== 3. Consultation et validation par le superviseur ==
+
+Sup -> Dash : Se connecter au dashboard
+Dash -> API : GET /collectes?equipe=superviseurId
+API -> DB : SELECT collectes (agents de l'équipe)
+DB --> API : Liste des collectes
+API --> Dash : Liste des collectes (status = PENDING_VALIDATION)
+Dash --> Sup : Afficher les collectes à valider
+
+Sup -> Dash : Sélectionner une collecte
+
+alt collecte validée
+    Sup -> Dash : Valider la collecte
+    Dash -> API : POST /collectes/{id}/validation (decision = VALIDEE)
+    API -> DB : INSERT validation
+    API -> DB : UPDATE collecte (status = VALIDATED)
+    DB --> API : Confirmation
+    API --> Dash : 200 OK
+    Dash --> Sup : Collecte validée
+else collecte rejetée
+    Sup -> Dash : Rejeter la collecte + commentaire
+    Dash -> API : POST /collectes/{id}/validation (decision = REJETEE, comment)
+    API -> DB : INSERT validation (avec commentaire)
+    API -> DB : UPDATE collecte (status = REJECTED)
+    DB --> API : Confirmation
+    API --> Dash : 200 OK
+    Dash --> Sup : Collecte rejetée
+end
+
+@enduml

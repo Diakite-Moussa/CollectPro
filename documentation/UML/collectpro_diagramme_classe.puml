@@ -1,0 +1,159 @@
+@startuml CollectPro_DiagrammeClasse
+
+title CollectPro - Diagramme de classe
+
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+enum RoleType {
+  ADMIN
+  SUPERVISOR
+  AGENT
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum FormStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CollecteStatus {
+  DRAFT
+  PENDING_SYNC
+  SYNCING
+  SYNCED
+  PENDING_VALIDATION
+  VALIDATED
+  REJECTED
+  ERROR
+}
+
+enum ValidationDecision {
+  VALIDEE
+  REJETEE
+}
+
+enum SyncStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+class Organization {
+  - id : Long
+  - name : String
+  - description : String
+  - status : OrganizationStatus
+  - createdAt : DateTime
+  + getUsers() : List<User>
+  + getForms() : List<Form>
+}
+
+class Role {
+  - id : Long
+  - name : RoleType
+}
+
+class User {
+  - id : Long
+  - firstName : String
+  - lastName : String
+  - email : String
+  - phone : String
+  - password : String
+  - status : UserStatus
+  - createdAt : DateTime
+  + authenticate(email, password) : Boolean
+  + getRole() : Role
+}
+
+class SupervisorAgent {
+  - id : Long
+  - createdAt : DateTime
+}
+
+class Form {
+  - id : Long
+  - name : String
+  - description : String
+  - status : FormStatus
+  - createdAt : DateTime
+  + getLatestVersion() : FormVersion
+}
+
+class FormVersion {
+  - id : Long
+  - versionNumber : Integer
+  - schemaJson : String
+  - createdAt : DateTime
+  + publish() : void
+}
+
+class Collecte {
+  - id : Long
+  - dataJson : String
+  - latitude : Double
+  - longitude : Double
+  - status : CollecteStatus
+  - createdAt : DateTime
+  - updatedAt : DateTime
+  + saveLocally() : void
+  + synchronize() : void
+  + submitForValidation() : void
+}
+
+class Validation {
+  - id : Long
+  - decision : ValidationDecision
+  - comment : String
+  - createdAt : DateTime
+  + approve() : void
+  + reject(comment : String) : void
+}
+
+class SyncLog {
+  - id : Long
+  - deviceId : String
+  - status : SyncStatus
+  - syncDate : DateTime
+  - errorMessage : String
+}
+
+' ---- Relations ----
+
+Organization "1" -- "*" User : possède >
+User "1" -- "1" Role : a un >
+
+User "1" -- "*" SupervisorAgent : supervise >
+SupervisorAgent "*" -- "1" User : agent >
+note right of SupervisorAgent
+  Un agent appartient à un seul superviseur.
+  Un superviseur gère plusieurs agents.
+end note
+
+Organization "1" -- "*" Form : définit >
+Form "1" -- "*" FormVersion : possède >
+
+FormVersion "1" -- "*" Collecte : utilisée par >
+User "1" -- "*" Collecte : saisit (agent) >
+
+Collecte "1" -- "*" Validation : fait l'objet de >
+User "1" -- "*" Validation : effectue (superviseur) >
+
+Collecte "1" -- "*" SyncLog : génère >
+
+Collecte "1" *-- "1" CollecteStatus
+Validation "1" *-- "1" ValidationDecision
+SyncLog "1" *-- "1" SyncStatus
+
+@enduml
