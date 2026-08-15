@@ -1,0 +1,201 @@
+@startuml CollectPro_CasUtilisation
+
+title CollectPro - Diagramme de cas d'utilisation (V1)
+
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Super Administrateur" as SuperAdmin
+actor "Administrateur\nprincipal" as AdminP
+actor "Administrateur\nsecondaire" as AdminS
+actor "Superviseur" as Sup
+actor "Agent terrain" as Agent
+
+' ---- Hiérarchie des acteurs ----
+AdminP --|> AdminS
+' L'Admin principal hérite des droits de base d'un Admin secondaire
+Sup --|> Agent
+' Le superviseur hérite des droits de consultation de base de l'agent
+
+rectangle "CollectPro" {
+
+  ' ---- Authentification / Compte (commun à tous) ----
+  usecase "S'authentifier" as UC_Auth
+  usecase "Activer son compte" as UC_Activate
+  usecase "Définir le mot de passe" as UC_SetPassword
+  usecase "Vérifier le token d'activation" as UC_VerifyToken
+  usecase "Réinitialiser le mot de passe oublié" as UC_ForgotPassword
+  usecase "Vérifier le token de réinitialisation" as UC_VerifyResetToken
+
+  ' ---- Super Administrateur ----
+  usecase "Créer une organisation" as UC_CreateOrg
+  usecase "Modifier une organisation" as UC_UpdateOrg
+  usecase "Activer / désactiver une organisation" as UC_ToggleOrg
+  usecase "Créer le premier Admin principal" as UC_CreateAdminP
+  usecase "Consulter les statistiques globales" as UC_StatsGlobal
+  usecase "Suivre l'activité globale de la plateforme" as UC_SuiviGlobal
+  usecase "Gérer les paramètres globaux" as UC_ParamsGlobal
+  usecase "Transférer la responsabilité admin. d'une org." as UC_TransferAdmin
+
+  ' ---- Admin principal / Admin secondaire (gestion organisation) ----
+  usecase "Créer un Admin secondaire" as UC_CreateAdminS
+  usecase "Créer un Superviseur" as UC_CreateSup
+  usecase "Créer un Agent" as UC_CreateAgent
+  usecase "Gérer les permissions d'un Admin secondaire" as UC_ManagePermissions
+  usecase "Affecter les agents aux superviseurs" as UC_Affect
+  usecase "Consulter les collectes de l'organisation" as UC_ConsultOrgCollectes
+  usecase "Consulter les statistiques de l'organisation" as UC_StatsOrg
+  usecase "Gérer les invitations" as UC_ManageInvites
+  usecase "Renvoyer une invitation" as UC_Reinvite
+  usecase "Consulter l'état des invitations" as UC_ConsultInvites
+  usecase "Désactiver un compte utilisateur" as UC_Disable
+  usecase "Gérer les formulaires de l'organisation" as UC_Forms
+  usecase "Créer / publier une version de formulaire" as UC_PublishForm
+  usecase "Générer des rapports" as UC_Reports
+
+  ' ---- Superviseur ----
+  usecase "Consulter les agents de son équipe" as UC_ConsultAgents
+  usecase "Suivre l'avancement des missions" as UC_SuiviMissions
+  usecase "Consulter les collectes de l'équipe" as UC_ConsultCollectesEquipe
+  usecase "Valider une collecte" as UC_Valider
+  usecase "Rejeter une collecte" as UC_Rejeter
+  usecase "Ajouter un commentaire de rejet" as UC_Commentaire
+
+  ' ---- Agent ----
+  usecase "Consulter les missions attribuées" as UC_Missions
+  usecase "Consulter les formulaires disponibles" as UC_ConsultForms
+  usecase "Remplir un formulaire de collecte" as UC_Formulaire
+  usecase "Modifier une collecte non validée" as UC_ModifierCollecte
+  usecase "Ajouter photos / documents" as UC_Photos
+  usecase "Capturer la position GPS" as UC_GPS
+  usecase "Sauvegarder une collecte hors connexion" as UC_SaveOffline
+  usecase "Synchroniser les données" as UC_Sync
+  usecase "Consulter l'état de synchronisation" as UC_ConsultSyncState
+
+  ' ---- Création / activation de compte (mécanisme interne) ----
+  usecase "Créer un compte utilisateur" as UC_CreateUser
+  usecase "Générer une invitation" as UC_GenInvite
+  usecase "Envoyer l'invitation (email/SMS)" as UC_SendInvite
+
+  ' ---- Fonctionnalités futures (V1.1 / V2) ----
+  usecase "Communiquer avec les Agents/Superviseurs" as UC_Communication
+  usecase "Utiliser l'assistant IA (texte/voix)" as UC_AssistantIA
+}
+
+' ==== Super Administrateur ====
+SuperAdmin --> UC_Auth
+SuperAdmin --> UC_CreateOrg
+SuperAdmin --> UC_UpdateOrg
+SuperAdmin --> UC_ToggleOrg
+SuperAdmin --> UC_CreateAdminP
+SuperAdmin --> UC_StatsGlobal
+SuperAdmin --> UC_SuiviGlobal
+SuperAdmin --> UC_ParamsGlobal
+SuperAdmin --> UC_TransferAdmin
+
+' ==== Administrateur principal ====
+AdminP --> UC_Auth
+AdminP --> UC_CreateAdminS
+AdminP --> UC_CreateSup
+AdminP --> UC_CreateAgent
+AdminP --> UC_Affect
+AdminP --> UC_ConsultOrgCollectes
+AdminP --> UC_StatsOrg
+AdminP --> UC_ManageInvites
+AdminP --> UC_Forms
+AdminP --> UC_Reports
+
+' ==== Administrateur secondaire ====
+AdminS --> UC_Auth
+AdminS --> UC_ManagePermissions
+AdminS --> UC_ConsultOrgCollectes
+AdminS --> UC_ManageInvites
+
+note right of AdminS
+  Les droits effectifs de l'Admin secondaire
+  dépendent des permissions qui lui sont
+  attribuées (CREATE_USER, CREATE_FORM,
+  VALIDATE_COLLECTE, etc.)
+end note
+
+UC_ManageInvites ..> UC_Reinvite : <<include>>
+UC_ManageInvites ..> UC_ConsultInvites : <<include>>
+UC_ManageInvites ..> UC_Disable : <<include>>
+UC_Forms ..> UC_PublishForm : <<include>>
+
+' ==== Superviseur ====
+Sup --> UC_ConsultAgents
+Sup --> UC_SuiviMissions
+Sup --> UC_ConsultCollectesEquipe
+Sup --> UC_Valider
+Sup --> UC_Rejeter
+Sup --> UC_Activate
+
+note right of Sup
+  Le Superviseur ne possède pas la
+  permission CREATE_COLLECTE, mais peut
+  utiliser l'app mobile pour ses missions
+  terrain (consultation, synchronisation).
+
+  Précision sur la généralisation Sup --|> Agent :
+  elle exprime que le Superviseur hérite des cas
+  d'usage de CONSULTATION de l'Agent (missions,
+  formulaires, état de sync), pas de la création
+  de collecte (UC_Formulaire). Cette restriction
+  est portée par la permission CREATE_COLLECTE
+  (RB-ORG-11/RB-ORG-12), pas par le diagramme lui-
+  même : ne pas déduire d'accès à UC_Formulaire à
+  partir du seul lien d'héritage.
+end note
+
+' ==== Agent ====
+Agent --> UC_Auth
+Agent --> UC_Missions
+Agent --> UC_ConsultForms
+Agent --> UC_Formulaire
+Agent --> UC_ModifierCollecte
+Agent --> UC_Photos
+Agent --> UC_GPS
+Agent --> UC_SaveOffline
+Agent --> UC_Sync
+Agent --> UC_ConsultSyncState
+Agent --> UC_Activate
+Agent --> UC_ForgotPassword
+AdminP --> UC_ForgotPassword
+AdminS --> UC_ForgotPassword
+Sup --> UC_ForgotPassword
+SuperAdmin --> UC_ForgotPassword
+
+' ==== Relations internes ====
+UC_Rejeter ..> UC_Commentaire : <<include>>
+UC_Formulaire ..> UC_Photos : <<extend>>
+UC_Formulaire ..> UC_GPS : <<extend>>
+UC_SaveOffline ..> UC_Sync : <<extend>>
+
+UC_CreateAdminP ..> UC_CreateUser : <<include>>
+UC_CreateAdminS ..> UC_CreateUser : <<include>>
+UC_CreateSup ..> UC_CreateUser : <<include>>
+UC_CreateAgent ..> UC_CreateUser : <<include>>
+UC_CreateUser ..> UC_GenInvite : <<include>>
+UC_GenInvite ..> UC_SendInvite : <<include>>
+UC_Reinvite ..> UC_GenInvite : <<include>>
+
+UC_Activate ..> UC_VerifyToken : <<include>>
+UC_Activate ..> UC_SetPassword : <<include>>
+
+UC_ForgotPassword ..> UC_VerifyResetToken : <<include>>
+UC_ForgotPassword ..> UC_SetPassword : <<include>>
+
+' ==== Fonctionnalités futures (V1.1 / V2, non incluses en V1) ====
+AdminP ..> UC_Communication : <<future>>
+AdminP ..> UC_AssistantIA : <<future>>
+Sup ..> UC_Communication : <<future>>
+Agent ..> UC_Communication : <<future>>
+
+note bottom of UC_AssistantIA
+  Fonctionnalité prévue en Version 2.
+  L'assistant peut escalader vers un
+  administrateur humain si nécessaire.
+end note
+
+@enduml

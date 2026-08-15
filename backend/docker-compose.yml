@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: collectepro_postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: collectepro_db
+      POSTGRES_USER: collectepro_user
+      POSTGRES_PASSWORD: collectepro_password
+
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - collectepro_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  collectepro_postgres_data:

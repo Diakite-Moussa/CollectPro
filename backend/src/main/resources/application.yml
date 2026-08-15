@@ -1,0 +1,65 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/collectepro_db
+    username: ${DB_USERNAME:collectepro_user}
+    password: ${DB_PASSWORD:collectepro_password}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  profiles:
+      active: ${SPRING_PROFILES_ACTIVE:dev}
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+    locations: classpath:db/migration
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 50MB
+
+server:
+  port: 8080
+
+jwt:
+  secret: ${JWT_SECRET:change-moi-en-une-longue-chaine-aleatoire-en-production}
+  expiration: 86400000
+
+app:
+  activation-token:
+    expiration-hours: 48
+  password-reset-token:
+    expiration-hours: 2
+
+  refresh-token:
+    expiration-days: 30
+
+  frontend-url: ${FRONTEND_URL:http://localhost:4200}
+
+  mail:
+    from: ${MAIL_FROM:no-reply@collectepro.local}
+
+  super-admin:
+    email: ${SUPER_ADMIN_EMAIL:superadmin@collectepro.local}
+    password: ${SUPER_ADMIN_PASSWORD}
+
+  storage:
+    upload-dir: ${UPLOAD_DIR:uploads}
+
+  cors:
+    allowed-origins: http://localhost:*,http://127.0.0.1:*

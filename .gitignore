@@ -1,0 +1,3 @@
+# Fichiers de credentials locaux (ne jamais committer)
+Email*.txt
+*.credentials.txt

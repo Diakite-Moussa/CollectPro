@@ -1,0 +1,211 @@
+@startuml CollectPro_DiagrammeSequence
+
+title CollectPro - Séquence : Organisation, Comptes, Collecte, Synchronisation et Validation
+
+actor "Super Admin" as SuperAdmin
+actor "Admin principal /\nAdmin secondaire" as AdminP
+actor "Agent" as Agent
+actor "Superviseur" as Sup
+participant "Dashboard Angular" as Dash
+participant "App Flutter" as App
+database "SQLite (Drift)" as SQLite
+participant "API REST\n(Spring Boot)" as API
+database "PostgreSQL" as DB
+participant "Email/SMS Service" as Notif
+
+== 0.a Création d'une organisation et de son Admin principal (Super Admin) ==
+
+SuperAdmin -> Dash : Créer une organisation
+Dash -> API : POST /organizations (nom, description)
+activate API
+API -> DB : INSERT organization (status = ACTIVE)
+SuperAdmin -> Dash : Créer le premier Admin principal
+Dash -> API : POST /users (rôle = ADMIN_PRINCIPAL, organization_id)
+API -> DB : INSERT user (status = INVITED, role = ADMIN_PRINCIPAL)
+API -> API : Générer token d'activation
+API -> DB : INSERT activation_token (expiresAt, usedAt = null)
+API -> Notif : Envoyer invitation (email/SMS)
+Notif --> AdminP : Invitation reçue
+API --> Dash : 201 Created
+deactivate API
+Dash --> SuperAdmin : Organisation et Admin principal créés
+
+== 0.b Création de comptes (Admin secondaire / Superviseur / Agent) ==
+
+AdminP -> Dash : Créer un compte (Admin secondaire, Superviseur ou Agent)
+Dash -> API : POST /users (nom, email, téléphone, rôle, organization_id)
+activate API
+API -> API : Vérifier permission CREATE_USER
+API -> DB : Vérifier que le rôle cible appartient à la même organisation
+API -> DB : INSERT user (status = INVITED)
+API -> API : Générer token d'activation
+API -> DB : INSERT activation_token (expiresAt, usedAt = null)
+API -> Notif : Envoyer invitation (email/SMS)
+Notif --> Agent : Invitation reçue
+API --> Dash : 201 Created
+deactivate API
+Dash --> AdminP : Compte créé (INVITED)
+
+== 0.c Activation du compte (tout utilisateur invité) ==
+
+Agent -> App : Ouvrir le lien d'activation
+App -> API : GET /activate?token=...
+activate API
+API -> DB : Vérifier le token (existence, expiration, usedAt)
+
+alt token valide
+    DB --> API : Token valide
+    API --> App : Formulaire de définition du mot de passe
+    Agent -> App : Définir le mot de passe
+    App -> API : POST /activate (token, nouveauMotDePasse)
+    API -> API : Hacher le mot de passe (BCrypt)
+    API -> DB : UPDATE user (password, status = ACTIVE)
+    API -> DB : UPDATE activation_token (usedAt = now)
+    API -> DB : INSERT audit_log (action = ACCOUNT_ACTIVATED)
+    DB --> API : Confirmation
+    API --> App : 200 OK
+    App --> Agent : Compte activé, redirection vers Login
+else token expiré, invalide ou déjà utilisé
+    DB --> API : Token invalide
+    API --> App : 400 Erreur (EXPIRED / INVALID / USED)
+    App --> Agent : Message d'erreur + option "redemander une invitation"
+    Agent -> App : Redemander une invitation
+    App -> API : POST /activation/resend
+    API -> API : Vérifier statut du compte (toujours INVITED)
+    API -> API : Générer un nouveau token d'activation
+    API -> DB : INSERT activation_token
+    API -> Notif : Envoyer nouvelle invitation
+    Notif --> Agent : Nouvelle invitation reçue
+end
+deactivate API
+
+Agent -> App : Se connecter (email + mot de passe)
+App -> API : POST /login
+activate API
+API -> DB : Vérifier statut = ACTIVE (et non DISABLED)
+API -> API : Résoudre rôle, permissions et organization_id
+API --> App : 200 OK (JWT + refresh token)
+deactivate API
+App --> Agent : Accès selon le rôle et les permissions
+
+== 0.d Mot de passe oublié ==
+
+Agent -> App : Sélectionner "Mot de passe oublié"
+Agent -> App : Fournir email ou téléphone
+App -> API : POST /password/forgot (identifiant)
+activate API
+API -> DB : Vérifier existence du compte (status = ACTIVE)
+
+alt compte existant et actif
+    API -> API : Générer token de réinitialisation
+    API -> DB : INSERT password_reset_token (expiresAt, usedAt = null)
+    API -> Notif : Envoyer lien/code de réinitialisation
+    Notif --> Agent : Lien de réinitialisation reçu
+    API --> App : 200 OK (réponse neutre)
+else compte inexistant ou inactif
+    API --> App : 200 OK (réponse neutre, sans confirmer l'existence)
+end
+deactivate API
+
+Agent -> App : Ouvrir le lien de réinitialisation
+App -> API : GET /password/reset?token=...
+activate API
+API -> DB : Vérifier le token (existence, expiration, usedAt)
+
+alt token valide
+    DB --> API : Token valide
+    API --> App : Formulaire nouveau mot de passe
+    Agent -> App : Définir le nouveau mot de passe
+    App -> API : POST /password/reset (token, nouveauMotDePasse)
+    API -> API : Hacher le mot de passe (BCrypt)
+    API -> DB : UPDATE user (password)
+    API -> DB : UPDATE password_reset_token (usedAt = now)
+    API -> DB : INSERT audit_log (action = PASSWORD_RESET_COMPLETED)
+    API --> App : 200 OK
+    App --> Agent : Mot de passe mis à jour, redirection vers Login
+else token expiré ou déjà utilisé
+    API --> App : 400 Erreur (EXPIRED / USED)
+    App --> Agent : Message d'erreur + nouvelle demande possible
+end
+deactivate API
+
+== 1. Création d'une collecte (hors connexion) ==
+
+Agent -> App : Consulter les formulaires disponibles
+Agent -> App : Remplir formulaire de collecte
+App -> App : Capturer position GPS
+App -> App : Ajouter photos / documents
+App -> SQLite : Sauvegarder collecte (status = DRAFT)
+SQLite --> App : Confirmation sauvegarde locale
+App -> SQLite : Mettre à jour status = PENDING_SYNC
+App --> Agent : Collecte enregistrée localement (état affiché)
+
+== 2. Synchronisation automatique (retour de connexion) ==
+
+App -> App : Détecter connexion Internet
+App -> SQLite : Récupérer collectes PENDING_SYNC
+SQLite --> App : Liste des collectes en attente
+
+loop pour chaque collecte en attente
+    App -> SQLite : Mettre à jour status = SYNCING
+    App -> API : POST /collectes (dataJson, GPS, photos, formVersionId)
+    activate API
+
+    API -> API : Vérifier organisation de l'agent
+    API -> API : Valider les données reçues (schéma, doublons)
+
+    alt données valides
+        API -> DB : INSERT collecte (status = PENDING_VALIDATION)
+        DB --> API : Confirmation
+        API -> DB : INSERT sync_log (status = SUCCESS)
+        API --> App : 200 OK (collecteId, status)
+        App -> SQLite : Mettre à jour status = SYNCED
+    else données invalides / doublon / erreur réseau
+        API --> App : 400/500 Erreur
+        App -> SQLite : Mettre à jour status = ERROR
+        App -> SQLite : INSERT sync_log local (error_message)
+    end
+
+    deactivate API
+end
+
+App --> Agent : Notification fin de synchronisation
+
+== 3. Consultation et validation par le superviseur ==
+
+Sup -> Dash : Se connecter au dashboard
+Dash -> API : GET /collectes?equipe=superviseurId
+activate API
+API -> DB : SELECT collectes (agents de l'équipe, même organisation)
+DB --> API : Liste des collectes
+API --> Dash : Liste des collectes (status = PENDING_VALIDATION)
+deactivate API
+Dash --> Sup : Afficher les collectes à valider
+
+Sup -> Dash : Sélectionner une collecte
+
+alt collecte validée
+    Sup -> Dash : Valider la collecte
+    Dash -> API : POST /collectes/{id}/validation (decision = VALIDEE)
+    activate API
+    API -> DB : INSERT validation
+    API -> DB : UPDATE collecte (status = VALIDATED)
+    API -> DB : INSERT audit_log (action = COLLECTE_VALIDATED)
+    DB --> API : Confirmation
+    API --> Dash : 200 OK
+    deactivate API
+    Dash --> Sup : Collecte validée
+else collecte rejetée
+    Sup -> Dash : Rejeter la collecte + commentaire
+    Dash -> API : POST /collectes/{id}/validation (decision = REJETEE, comment)
+    activate API
+    API -> DB : INSERT validation (avec commentaire)
+    API -> DB : UPDATE collecte (status = REJECTED)
+    API -> DB : INSERT audit_log (action = COLLECTE_REJECTED)
+    DB --> API : Confirmation
+    API --> Dash : 200 OK
+    deactivate API
+    Dash --> Sup : Collecte rejetée
+end
+
+@enduml

@@ -1,0 +1,40 @@
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:86400000}
+
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+app:
+  frontend-url: ${FRONTEND_URL}
+  mail:
+    from: ${MAIL_FROM}
+  super-admin:
+    email: ${SUPER_ADMIN_EMAIL}
+    password: ${SUPER_ADMIN_PASSWORD}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}
+  storage:
+    upload-dir: ${UPLOAD_DIR:/var/collectpro/uploads}
+
+logging:
+  level:
+    com.collectpro.backend: INFO

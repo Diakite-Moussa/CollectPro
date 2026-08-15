@@ -1,0 +1,269 @@
+@startuml CollectPro_DiagrammeClasse
+
+title CollectPro - Diagramme de classe (multi-organisation)
+
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+enum RoleType {
+  SUPER_ADMIN
+  ADMIN_PRINCIPAL
+  ADMIN_SECONDAIRE
+  SUPERVISOR
+  AGENT
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  DISABLED
+}
+note left of UserStatus
+  INVITATION_EXPIRED n'est pas un statut
+  permanent du compte : c'est un état
+  transitoire du token d'activation.
+  Le compte reste INVITED tant qu'aucune
+  activation valide n'a eu lieu.
+end note
+
+enum FormStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CollecteStatus {
+  DRAFT
+  PENDING_SYNC
+  SYNCING
+  SYNCED
+  PENDING_VALIDATION
+  VALIDATED
+  REJECTED
+  ERROR
+}
+
+enum ValidationDecision {
+  VALIDEE
+  REJETEE
+}
+
+enum SyncStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+class Organization {
+  - id : Long
+  - name : String
+  - description : String
+  - status : OrganizationStatus
+  - createdAt : DateTime
+  + getUsers() : List<User>
+  + getForms() : List<Form>
+  + hasActivePrincipalAdmin() : Boolean
+}
+
+class Role {
+  - id : Long
+  - name : RoleType
+  + getPermissions() : List<Permission>
+}
+
+class Permission {
+  - id : Long
+  - code : String
+  - description : String
+}
+
+class RolePermission {
+  - id : Long
+}
+
+class UserPermission {
+  - id : Long
+  - grantedBy : Long
+  - createdAt : DateTime
+}
+note right of UserPermission
+  Permission accordée directement à un
+  utilisateur, en complément de celles de
+  son rôle. Utilisé principalement pour
+  personnaliser les droits d'un Admin
+  secondaire. Permissions effectives =
+  role_permissions ∪ user_permissions.
+end note
+
+class User {
+  - id : Long
+  - firstName : String
+  - lastName : String
+  - email : String
+  - phone : String
+  - password : String
+  - status : UserStatus
+  - createdAt : DateTime
+  - updatedAt : DateTime
+  + authenticate(email, password) : Boolean
+  + getRole() : Role
+  + hasPermission(code : String) : Boolean
+  + invite() : void
+  + activate(rawPassword : String) : void
+  + disable() : void
+  + requestPasswordReset() : void
+}
+note right of User
+  organization_id est obligatoire pour
+  tous les rôles sauf SUPER_ADMIN, qui
+  dispose d'un accès global à la plateforme
+  (exception fonctionnelle).
+end note
+
+class ActivationToken {
+  - id : Long
+  - tokenHash : String
+  - expiresAt : DateTime
+  - usedAt : DateTime
+  - createdAt : DateTime
+  + isValid() : Boolean
+  + markUsed() : void
+  + isExpired() : Boolean
+}
+
+class PasswordResetToken {
+  - id : Long
+  - tokenHash : String
+  - expiresAt : DateTime
+  - usedAt : DateTime
+  - createdAt : DateTime
+  + isValid() : Boolean
+  + markUsed() : void
+}
+
+class SupervisorAgent {
+  - id : Long
+  - createdAt : DateTime
+}
+
+class Form {
+  - id : Long
+  - name : String
+  - description : String
+  - status : FormStatus
+  - createdAt : DateTime
+  + getLatestVersion() : FormVersion
+}
+
+class FormVersion {
+  - id : Long
+  - versionNumber : Integer
+  - schemaJson : String
+  - createdAt : DateTime
+  + publish() : void
+}
+
+class Collecte {
+  - id : Long
+  - dataJson : String
+  - latitude : Double
+  - longitude : Double
+  - status : CollecteStatus
+  - createdAt : DateTime
+  - updatedAt : DateTime
+  + saveLocally() : void
+  + synchronize() : void
+  + submitForValidation() : void
+  + update() : void
+}
+
+class Validation {
+  - id : Long
+  - decision : ValidationDecision
+  - comment : String
+  - createdAt : DateTime
+  + approve() : void
+  + reject(comment : String) : void
+}
+
+class SyncLog {
+  - id : Long
+  - deviceId : String
+  - status : SyncStatus
+  - syncDate : DateTime
+  - errorMessage : String
+}
+
+class AuditLog {
+  - id : Long
+  - action : String
+  - entityType : String
+  - entityId : Long
+  - details : String
+  - createdAt : DateTime
+}
+
+' ---- Relations : Organisation / Utilisateurs / Rôles ----
+
+Organization "1" -- "0..*" User : possède >
+User "*" -- "1" Role : a un >
+Role "*" -- "*" Permission : accorde >
+(Role, Permission) .. RolePermission
+
+User "1" -- "0..*" ActivationToken : possède >
+User "1" -- "0..*" PasswordResetToken : possède >
+User "1" -- "0..*" UserPermission : possède >
+UserPermission "*" -- "1" Permission : accorde >
+
+Organization "1" -- "0..1" User : Admin principal actif >
+note on link
+  Une organisation possède un seul
+  Administrateur principal actif
+  (RB-ORG-03).
+end note
+
+' ---- Relations : Affectation Superviseur / Agent ----
+
+User "1" -- "*" SupervisorAgent : supervise (superviseur) >
+SupervisorAgent "*" -- "1" User : agent affecté >
+note right of SupervisorAgent
+  Un agent appartient à un seul superviseur.
+  Un superviseur gère plusieurs agents.
+  Les deux utilisateurs appartiennent à la
+  même organisation (RB-ORG-08).
+end note
+
+' ---- Relations : Formulaires et collectes ----
+
+Organization "1" -- "*" Form : définit >
+Form "1" -- "*" FormVersion : possède >
+
+FormVersion "1" -- "*" Collecte : utilisée par >
+User "1" -- "*" Collecte : saisit (agent) >
+
+Collecte "1" -- "*" Validation : fait l'objet de >
+User "1" -- "*" Validation : effectue (superviseur) >
+
+Collecte "1" -- "*" SyncLog : génère >
+
+' ---- Traçabilité ----
+
+User "1" -- "*" AuditLog : réalise >
+Organization "1" -- "*" AuditLog : concerne >
+
+' ---- Attributs typés (enums) ----
+
+Organization "1" *-- "1" OrganizationStatus
+User "1" *-- "1" UserStatus
+Role "1" *-- "1" RoleType
+Form "1" *-- "1" FormStatus
+Collecte "1" *-- "1" CollecteStatus
+Validation "1" *-- "1" ValidationDecision
+SyncLog "1" *-- "1" SyncStatus
+
+@enduml
