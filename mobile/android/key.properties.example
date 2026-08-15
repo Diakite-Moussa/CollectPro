@@ -1,0 +1,17 @@
+## Copiez ce fichier vers mobile/android/key.properties et remplissez avec vos
+## vraies valeurs. Ce fichier ne doit JAMAIS etre commite (deja dans .gitignore).
+##
+## 1. Generez d'abord votre keystore de release (une seule fois, a conserver
+##    precieusement - le perdre vous empeche de publier des mises a jour) :
+##
+##    keytool -genkey -v -keystore collectpro-release.jks -keyalg RSA \
+##      -keysize 2048 -validity 10000 -alias collectpro
+##
+## 2. Placez le .jks genere dans mobile/android/ (ou un chemin absolu, hors repo)
+##
+## 3. Renseignez les valeurs ci-dessous :
+
+storeFile=collectpro-release.jks
+storePassword=CHANGEZ_MOI
+keyAlias=collectpro
+keyPassword=CHANGEZ_MOI

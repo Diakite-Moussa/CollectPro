@@ -1,11 +1,21 @@
 #!/bin/bash
 
 # Configuration
+# Charge les variables depuis le .env de production si present, pour rester
+# synchronise avec les identifiants reellement utilises par docker-compose
+# (DB_USERNAME peut differer de la valeur par defaut "collectepro_user").
+ENV_FILE="$(dirname "$0")/../.env"
+if [ -f "$ENV_FILE" ]; then
+    set -a
+    source "$ENV_FILE"
+    set +a
+fi
+
 BACKUP_DIR="/var/backups/collectpro"
 DATE=$(date +%Y%m%d_%H%M%S)
 CONTAINER_NAME="collectpro_db_prod"
 DB_NAME="collectepro_db"
-DB_USER="collectepro_user"
+DB_USER="${DB_USERNAME:-collectepro_user}"
 
 # Création du dossier de backup si inexistant
 mkdir -p $BACKUP_DIR
