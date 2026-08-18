@@ -12,4 +12,5 @@ export const ROUTE_ROLES: Record<string, AppRole[]> = {
   forms: ['ADMIN_PRINCIPAL', 'ADMIN_SECONDAIRE'],
   collectes: ['ADMIN_PRINCIPAL', 'ADMIN_SECONDAIRE', 'SUPERVISOR'],
   'audit-logs': ['SUPER_ADMIN', 'ADMIN_PRINCIPAL', 'ADMIN_SECONDAIRE'],
+  'sync-logs': ['SUPER_ADMIN', 'ADMIN_PRINCIPAL', 'ADMIN_SECONDAIRE', 'SUPERVISOR'],
 };

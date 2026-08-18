@@ -5,6 +5,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatButtonModule } from '@angular/material/button';
+import { ChartConfiguration, ChartData } from 'chart.js';
+import { BaseChartDirective } from 'ng2-charts';
 import { StatisticsService } from '../../core/services/statistics.service';
 import { CollecteService } from '../../core/services/collecte.service';
 import { CollecteResponse } from '../../core/models/collecte.model';
@@ -19,7 +21,8 @@ import { AuthService } from '../../core/services/auth.service';
     MatIconModule,
     MatTableModule,
     MatChipsModule,
-    MatButtonModule
+    MatButtonModule,
+    BaseChartDirective
   ],
   template: `
     <div class="dashboard-home">
@@ -66,6 +69,34 @@ import { AuthService } from '../../core/services/auth.service';
               <span class="stat-value">{{ pendingCount }}</span>
               <span class="stat-label">En Attente de Validation</span>
             </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+
+      <div class="charts-grid mt-6" *ngIf="hasChartData">
+        <mat-card class="chart-card">
+          <mat-card-header>
+            <mat-card-title>Répartition des Collectes</mat-card-title>
+          </mat-card-header>
+          <mat-card-content class="chart-content">
+            <canvas baseChart
+              [data]="collecteStatusChartData"
+              [type]="'doughnut'"
+              [options]="doughnutOptions">
+            </canvas>
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card class="chart-card">
+          <mat-card-header>
+            <mat-card-title>Répartition des Utilisateurs par Rôle</mat-card-title>
+          </mat-card-header>
+          <mat-card-content class="chart-content">
+            <canvas baseChart
+              [data]="userRoleChartData"
+              [type]="'bar'"
+              [options]="barOptions">
+            </canvas>
           </mat-card-content>
         </mat-card>
       </div>
@@ -173,6 +204,22 @@ import { AuthService } from '../../core/services/auth.service';
       &.purple .stat-icon { background: #8b5cf6; }
       &.orange .stat-icon { background: #f59e0b; }
     }
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1rem;
+    }
+    .chart-card {
+      border-radius: 12px;
+      border: none;
+    }
+    .chart-content {
+      height: 280px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
     .mt-6 {
       margin-top: 1.5rem;
     }
@@ -205,6 +252,46 @@ export class DashboardHomeComponent implements OnInit {
   recentCollectes: CollecteResponse[] = [];
   displayedColumns = ['id', 'agent', 'coords', 'status', 'createdAt'];
 
+  hasChartData = false;
+
+  collecteStatusChartData: ChartData<'doughnut'> = {
+    labels: ['En attente', 'Validées', 'Rejetées'],
+    datasets: [{
+      data: [0, 0, 0],
+      backgroundColor: ['#f59e0b', '#10b981', '#ef4444'],
+      borderWidth: 0
+    }]
+  };
+
+  userRoleChartData: ChartData<'bar'> = {
+    labels: ['Agents', 'Superviseurs', 'Admins'],
+    datasets: [{
+      label: 'Nombre d\'utilisateurs',
+      data: [0, 0, 0],
+      backgroundColor: ['#2563eb', '#8b5cf6', '#10b981'],
+      borderRadius: 6
+    }]
+  };
+
+  doughnutOptions: ChartConfiguration<'doughnut'>['options'] = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom' }
+    }
+  };
+
+  barOptions: ChartConfiguration<'bar'>['options'] = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false }
+    },
+    scales: {
+      y: { beginAtZero: true, ticks: { precision: 0 } }
+    }
+  };
+
   ngOnInit(): void {
     const role = this.user()?.role;
     this.isSuperAdmin = role === 'SUPER_ADMIN';
@@ -220,6 +307,24 @@ export class DashboardHomeComponent implements OnInit {
         this.formCount = stats.publishedForms ?? 0;
         this.collecteCount = stats.totalCollectes ?? 0;
         this.pendingCount = stats.pendingCollectes ?? 0;
+
+        this.collecteStatusChartData = {
+          ...this.collecteStatusChartData,
+          datasets: [{
+            ...this.collecteStatusChartData.datasets[0],
+            data: [stats.pendingCollectes ?? 0, stats.validatedCollectes ?? 0, stats.rejectedCollectes ?? 0]
+          }]
+        };
+
+        this.userRoleChartData = {
+          ...this.userRoleChartData,
+          datasets: [{
+            ...this.userRoleChartData.datasets[0],
+            data: [stats.totalAgents ?? 0, stats.totalSupervisors ?? 0, stats.totalAdmins ?? 0]
+          }]
+        };
+
+        this.hasChartData = true;
       },
       error: () => {}
     });

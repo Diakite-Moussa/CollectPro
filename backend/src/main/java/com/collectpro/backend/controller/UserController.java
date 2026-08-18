@@ -1,8 +1,11 @@
 package com.collectpro.backend.controller;
 
 import com.collectpro.backend.dto.AssignSupervisorRequest;
+import com.collectpro.backend.dto.ChangePasswordRequest;
 import com.collectpro.backend.dto.CreateUserRequest;
+import com.collectpro.backend.dto.UpdateProfileRequest;
 import com.collectpro.backend.dto.UpdateUserPermissionsRequest;
+import com.collectpro.backend.dto.UpdateUserStatusRequest;
 import com.collectpro.backend.dto.UserPermissionsResponse;
 import com.collectpro.backend.dto.UserResponse;
 import com.collectpro.backend.security.CustomUserDetails;
@@ -76,6 +79,47 @@ public class UserController {
             @Valid @RequestBody UpdateUserPermissionsRequest request) {
         return ResponseEntity.ok(permissionService.updateUserPermissions(principal.getUser(), id, request));
     }
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<UserResponse> getMe(
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        return ResponseEntity.ok(userService.getCurrentUser(principal.getUser()));
+    }
 
+    @PutMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<UserResponse> updateProfile(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @Valid @RequestBody UpdateProfileRequest request) {
+        return ResponseEntity.ok(userService.updateProfile(principal.getUser(), request));
+    }
+
+    @PutMapping("/me/password")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> changePassword(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        userService.changePassword(principal.getUser(), request);
+        return ResponseEntity.noContent().build();
+    }
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("@securityAuth.hasPermission(authentication, 'DISABLE_USER')")
+    public ResponseEntity<UserResponse> updateUserStatus(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @Valid @RequestBody UpdateUserStatusRequest request) {
+        return ResponseEntity.ok(userService.updateUserStatus(principal.getUser(), id, request));
+    }
+
+    /**
+     * Fix #2 — endpoint dédié pour les Superviseurs : retourne uniquement
+     * les Agents qu'ils supervisent, sans charger tous les utilisateurs de l'org.
+     */
+    @GetMapping("/my-agents")
+    @PreAuthorize("@securityAuth.hasRole(authentication, 'SUPERVISOR')")
+    public ResponseEntity<List<UserResponse>> getMyAgents(
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        return ResponseEntity.ok(userService.getMyAgents(principal.getUser()));
+    }
 
 }

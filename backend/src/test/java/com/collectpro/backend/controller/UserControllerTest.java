@@ -1,7 +1,9 @@
 package com.collectpro.backend.controller;
 
 import com.collectpro.backend.dto.AssignSupervisorRequest;
+import com.collectpro.backend.dto.ChangePasswordRequest;
 import com.collectpro.backend.dto.CreateUserRequest;
+import com.collectpro.backend.dto.UpdateProfileRequest;
 import com.collectpro.backend.dto.UserResponse;
 import com.collectpro.backend.entity.Organization;
 import com.collectpro.backend.entity.Role;
@@ -40,6 +42,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(UserController.class)
@@ -168,5 +171,65 @@ class UserControllerTest {
                 .andExpect(status().isForbidden());
 
         verify(permissionService, never()).getUserPermissions(any(), any());
+    }
+
+    @Test
+    @DisplayName("GET /users/me - Retourne le profil de l'utilisateur connecté")
+    void getMe_ReturnsCurrentUser() throws Exception {
+        UserResponse meResp = UserResponse.builder()
+                .id(1L)
+                .email("admin@test.com")
+                .firstName("Admin")
+                .lastName("Principal")
+                .build();
+
+        when(userService.getCurrentUser(any())).thenReturn(meResp);
+
+        mockMvc.perform(get("/users/me").principal(authPrincipal))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("admin@test.com"))
+                .andExpect(jsonPath("$.firstName").value("Admin"));
+    }
+
+    @Test
+    @DisplayName("PUT /users/me - Met à jour le profil et retourne le nouveau UserResponse")
+    void updateProfile_ReturnsUpdatedUser() throws Exception {
+        UpdateProfileRequest req = new UpdateProfileRequest();
+        req.setFirstName("Nouveau");
+        req.setLastName("Nom");
+        req.setPhone("+221771234567");
+
+        UserResponse updated = UserResponse.builder()
+                .id(1L)
+                .firstName("Nouveau")
+                .lastName("Nom")
+                .email("admin@test.com")
+                .build();
+
+        when(userService.updateProfile(any(), any())).thenReturn(updated);
+
+        mockMvc.perform(put("/users/me")
+                        .principal(authPrincipal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.firstName").value("Nouveau"))
+                .andExpect(jsonPath("$.lastName").value("Nom"));
+    }
+
+    @Test
+    @DisplayName("PUT /users/me/password - Retourne 204 No Content après changement")
+    void changePassword_ReturnsNoContent() throws Exception {
+        ChangePasswordRequest req = new ChangePasswordRequest();
+        req.setCurrentPassword("OldPass123");
+        req.setNewPassword("NewPass456");
+
+        doNothing().when(userService).changePassword(any(), any());
+
+        mockMvc.perform(put("/users/me/password")
+                        .principal(authPrincipal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isNoContent());
     }
 }

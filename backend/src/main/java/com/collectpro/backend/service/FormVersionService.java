@@ -43,6 +43,10 @@ public class FormVersionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Version de formulaire introuvable (id=" + versionId + ")"));
     }
 
+    public FormVersionResponse getVersionResponse(Long versionId) {
+        return toResponse(getVersionEntity(versionId));
+    }
+
     public List<FormVersionResponse> getVersionsForForm(Long formId) {
         Form form = formService.getFormEntity(formId);
         return formVersionRepository.findByFormOrderByVersionNumberDesc(form).stream()

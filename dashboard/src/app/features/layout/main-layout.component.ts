@@ -46,6 +46,10 @@ import { ROUTE_ROLES } from '../../core/constants/route-roles';
               <p class="menu-email">{{ user()?.email }}</p>
               <p class="menu-org" *ngIf="user()?.organizationName">{{ user()?.organizationName }}</p>
             </div>
+            <button mat-menu-item routerLink="/profile">
+              <mat-icon>account_circle</mat-icon>
+              <span>Mon profil</span>
+            </button>
             <button mat-menu-item (click)="onLogout()">
               <mat-icon color="warn">exit_to_app</mat-icon>
               <span>Déconnexion</span>
@@ -77,6 +81,12 @@ import { ROUTE_ROLES } from '../../core/constants/route-roles';
               <mat-icon matListItemIcon>sync_alt</mat-icon>
               <span matListItemTitle>Collectes Terrain</span>
             </a>
+
+            <a mat-list-item routerLink="/sync-logs" routerLinkActive="active-link" *ngIf="canAccess('sync-logs')">
+              <mat-icon matListItemIcon>sync</mat-icon>
+              <span matListItemTitle>Synchronisations</span>
+            </a>
+
             <a mat-list-item routerLink="/audit-logs" routerLinkActive="active-link" *ngIf="canAccess('audit-logs')">
               <mat-icon matListItemIcon>shield</mat-icon>
               <span matListItemTitle>Journal d'Audit</span>

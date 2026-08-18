@@ -106,7 +106,7 @@ class AuthServiceTest {
         when(tokenUtil.generateRawToken()).thenReturn("mocked_raw_refresh");
         when(tokenUtil.hashToken("mocked_raw_refresh")).thenReturn("mocked_hash_refresh");
 
-        AuthResponse response = authService.login(request);
+        AuthResponse response = authService.login(request, null);
 
         assertNotNull(response);
         assertEquals("mocked_jwt_token", response.getAccessToken());
@@ -124,7 +124,7 @@ class AuthServiceTest {
 
         when(userRepository.findByEmail("unknown@test.com")).thenReturn(Optional.empty());
 
-        assertThrows(InvalidCredentialsException.class, () -> authService.login(request));
+        assertThrows(InvalidCredentialsException.class, () -> authService.login(request, null));
     }
 
     @Test
@@ -136,7 +136,7 @@ class AuthServiceTest {
 
         when(userRepository.findByEmail("inactive@test.com")).thenReturn(Optional.of(inactiveUser));
 
-        assertThrows(BusinessRuleException.class, () -> authService.login(request));
+        assertThrows(BusinessRuleException.class, () -> authService.login(request, null));
     }
 
     @Test
@@ -149,7 +149,45 @@ class AuthServiceTest {
         when(userRepository.findByEmail("agent@test.com")).thenReturn(Optional.of(activeUser));
         when(passwordEncoder.matches("wrong_pass", "encoded_pass")).thenReturn(false);
 
-        assertThrows(InvalidCredentialsException.class, () -> authService.login(request));
+        assertThrows(InvalidCredentialsException.class, () -> authService.login(request, null));
+    }
+
+    @Test
+    @DisplayName("login() - Échec : un AGENT ne peut pas se connecter depuis le web")
+    void login_AgentOnWeb_ThrowsException() {
+        LoginRequest request = new LoginRequest();
+        request.setEmail("agent@test.com");
+        request.setPassword("password123");
+
+        when(userRepository.findByEmail("agent@test.com")).thenReturn(Optional.of(activeUser));
+        when(passwordEncoder.matches("password123", "encoded_pass")).thenReturn(true);
+
+        assertThrows(BusinessRuleException.class, () -> authService.login(request, "WEB"));
+    }
+
+    @Test
+    @DisplayName("login() - Échec : un ADMIN_PRINCIPAL ne peut pas se connecter depuis le mobile")
+    void login_AdminOnMobile_ThrowsException() {
+        Role adminRole = Role.builder().id(2L).name(RoleType.ADMIN_PRINCIPAL).build();
+        User adminUser = User.builder()
+                .id(20L)
+                .email("admin@test.com")
+                .password("encoded_pass")
+                .firstName("Awa")
+                .lastName("Traore")
+                .status(UserStatus.ACTIVE)
+                .role(adminRole)
+                .organization(testOrg)
+                .build();
+
+        LoginRequest request = new LoginRequest();
+        request.setEmail("admin@test.com");
+        request.setPassword("password123");
+
+        when(userRepository.findByEmail("admin@test.com")).thenReturn(Optional.of(adminUser));
+        when(passwordEncoder.matches("password123", "encoded_pass")).thenReturn(true);
+
+        assertThrows(BusinessRuleException.class, () -> authService.login(request, "MOBILE"));
     }
 
     @Test
@@ -171,7 +209,7 @@ class AuthServiceTest {
         when(tokenUtil.generateRawToken()).thenReturn("new_raw_refresh");
         when(tokenUtil.hashToken("new_raw_refresh")).thenReturn("new_hash_refresh");
 
-        AuthResponse response = authService.refresh(request);
+        AuthResponse response = authService.refresh(request, null);
 
         assertNotNull(response);
         assertEquals("new_jwt_token", response.getAccessToken());

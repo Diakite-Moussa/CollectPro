@@ -2,7 +2,7 @@ export interface OrganizationResponse {
   id: number;
   name: string;
   description?: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  status: 'ACTIVE' | 'INACTIVE'; // ⚠️ corrigé : 'SUSPENDED' n'existe pas côté backend
   createdAt: string;
   principalAdmin?: {
     id: number;
@@ -20,4 +20,13 @@ export interface CreateOrganizationRequest {
   adminFirstName: string;
   adminLastName: string;
   adminPhone?: string;
+}
+
+export interface UpdateOrganizationRequest {
+  name: string;
+  description?: string;
+}
+
+export interface UpdateOrganizationStatusRequest {
+  status: 'ACTIVE' | 'INACTIVE';
 }

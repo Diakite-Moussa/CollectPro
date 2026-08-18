@@ -20,14 +20,16 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        AuthResponse response = authService.login(request);
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
+                                               @RequestHeader(value = "X-Client-Platform", required = false) String clientPlatform) {
+        AuthResponse response = authService.login(request, clientPlatform);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
-        AuthResponse response = authService.refresh(request);
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request,
+                                                 @RequestHeader(value = "X-Client-Platform", required = false) String clientPlatform) {
+        AuthResponse response = authService.refresh(request, clientPlatform);
         return ResponseEntity.ok(response);
     }
 

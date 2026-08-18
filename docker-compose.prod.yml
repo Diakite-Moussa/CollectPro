@@ -43,12 +43,11 @@ services:
     image: nginx:alpine
     container_name: collectpro_nginx_prod
     ports:
+      # Port 80 uniquement : ngrok tunnelise ce port et gere le HTTPS public lui-meme.
       - "80:80"
-      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./dashboard/dist/dashboard/browser:/usr/share/nginx/html:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - backend
     restart: always

@@ -1,3 +1,8 @@
 # Fichiers de credentials locaux (ne jamais committer)
 Email*.txt
 *.credentials.txt
+
+# Secrets de production (mots de passe BD, secret JWT, identifiants mail...)
+.env
+.env.local
+.env.*.local

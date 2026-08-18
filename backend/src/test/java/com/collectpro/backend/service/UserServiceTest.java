@@ -1,6 +1,9 @@
 package com.collectpro.backend.service;
 
+import com.collectpro.backend.dto.ChangePasswordRequest;
 import com.collectpro.backend.dto.CreateUserRequest;
+import com.collectpro.backend.dto.UpdateProfileRequest;
+import com.collectpro.backend.dto.UpdateUserStatusRequest;
 import com.collectpro.backend.dto.UserResponse;
 import com.collectpro.backend.entity.Organization;
 import com.collectpro.backend.entity.Role;
@@ -9,6 +12,8 @@ import com.collectpro.backend.enums.AuditAction;
 import com.collectpro.backend.enums.RoleType;
 import com.collectpro.backend.enums.UserStatus;
 import com.collectpro.backend.exception.BusinessRuleException;
+import com.collectpro.backend.exception.ForbiddenOperationException;
+import com.collectpro.backend.exception.InvalidCredentialsException;
 import com.collectpro.backend.repository.RoleRepository;
 import com.collectpro.backend.repository.SupervisorAgentRepository;
 import com.collectpro.backend.repository.UserRepository;
@@ -131,5 +136,182 @@ class UserServiceTest {
         assertThrows(BusinessRuleException.class, () -> userService.createUser(adminUser, request));
         verify(userRepository, never()).save(any());
         verify(auditLogService, never()).log(any(), any(), any(), any(), any(), any());
+    }
+
+    // -----------------------------------------------------------------------
+    // RF-PROFILE-01 : getCurrentUser
+    // -----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("getCurrentUser - Retourne un UserResponse depuis le principal sans requête BDD")
+    void getCurrentUser_ReturnsMappedResponse() {
+        UserResponse response = userService.getCurrentUser(adminUser);
+
+        assertNotNull(response);
+        assertEquals(adminUser.getEmail(), response.getEmail());
+        assertEquals(adminUser.getFirstName(), response.getFirstName());
+        // Aucune requête BDD ne doit avoir été effectuée
+        verify(userRepository, never()).findById(any());
+    }
+
+    // -----------------------------------------------------------------------
+    // RF-PROFILE-02 : updateProfile
+    // -----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("updateProfile - Succès : met à jour firstName, lastName et phone")
+    void updateProfile_Success() {
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setFirstName("Nouveau");
+        request.setLastName("Nom");
+        request.setPhone("+221771234567");
+
+        when(userRepository.findById(10L)).thenReturn(Optional.of(adminUser));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserResponse response = userService.updateProfile(adminUser, request);
+
+        assertNotNull(response);
+        assertEquals("Nouveau", response.getFirstName());
+        assertEquals("Nom", response.getLastName());
+        assertEquals("+221771234567", response.getPhone());
+        verify(userRepository).save(any(User.class));
+    }
+
+    // -----------------------------------------------------------------------
+    // RF-PROFILE-03 : changePassword
+    // -----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("changePassword - Succès avec bon mot de passe actuel")
+    void changePassword_Success() {
+        ChangePasswordRequest request = new ChangePasswordRequest();
+        request.setCurrentPassword("OldPass123");
+        request.setNewPassword("NewPass456");
+
+        when(userRepository.findById(10L)).thenReturn(Optional.of(adminUser));
+        when(passwordEncoder.matches("OldPass123", adminUser.getPassword())).thenReturn(true);
+        when(passwordEncoder.encode("NewPass456")).thenReturn("encoded-new-pass");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertDoesNotThrow(() -> userService.changePassword(adminUser, request));
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    @DisplayName("changePassword - Échec si le mot de passe actuel est incorrect")
+    void changePassword_WrongCurrentPassword_ThrowsException() {
+        ChangePasswordRequest request = new ChangePasswordRequest();
+        request.setCurrentPassword("WrongPass");
+        request.setNewPassword("NewPass456");
+
+        when(userRepository.findById(10L)).thenReturn(Optional.of(adminUser));
+        when(passwordEncoder.matches("WrongPass", adminUser.getPassword())).thenReturn(false);
+
+        assertThrows(InvalidCredentialsException.class, () -> userService.changePassword(adminUser, request));
+        verify(userRepository, never()).save(any());
+    }
+
+    // -----------------------------------------------------------------------
+    // RF-USER-11 : updateUserStatus
+    // -----------------------------------------------------------------------
+
+    @Test
+    @DisplayName("updateUserStatus - Désactivation réussie d'un agent par un admin")
+    void updateUserStatus_DisableAgent_Success() {
+        Role agentRoleLocal = Role.builder().id(3L).name(RoleType.AGENT).build();
+        User agent = User.builder()
+                .id(20L)
+                .email("agent@test.com")
+                .firstName("Agent")
+                .lastName("Test")
+                .role(agentRoleLocal)
+                .organization(org)
+                .status(UserStatus.ACTIVE)
+                .build();
+
+        UpdateUserStatusRequest request = new UpdateUserStatusRequest();
+        request.setStatus(UserStatus.DISABLED);
+
+        when(userRepository.findById(10L)).thenReturn(Optional.of(adminUser));
+        when(userRepository.findById(20L)).thenReturn(Optional.of(agent));
+        when(permissionService.hasPermission(adminUser, "DISABLE_USER")).thenReturn(true);
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserResponse response = userService.updateUserStatus(adminUser, 20L, request);
+
+        assertNotNull(response);
+        assertEquals("DISABLED", response.getStatus());
+        verify(userRepository).save(any(User.class));
+        verify(auditLogService).log(any(), any(), eq(AuditAction.USER_DISABLED), any(), any(), anyString());
+    }
+
+    @Test
+    @DisplayName("updateUserStatus - Réactivation réussie d'un compte DISABLED")
+    void updateUserStatus_ReactivateUser_Success() {
+        Role agentRoleLocal = Role.builder().id(3L).name(RoleType.AGENT).build();
+        User disabledAgent = User.builder()
+                .id(21L)
+                .email("disabled@test.com")
+                .firstName("Disabled")
+                .lastName("Agent")
+                .role(agentRoleLocal)
+                .organization(org)
+                .status(UserStatus.DISABLED)
+                .build();
+
+        UpdateUserStatusRequest request = new UpdateUserStatusRequest();
+        request.setStatus(UserStatus.ACTIVE);
+
+        when(userRepository.findById(10L)).thenReturn(Optional.of(adminUser));
+        when(userRepository.findById(21L)).thenReturn(Optional.of(disabledAgent));
+        when(permissionService.hasPermission(adminUser, "DISABLE_USER")).thenReturn(true);
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserResponse response = userService.updateUserStatus(adminUser, 21L, request);
+
+        assertNotNull(response);
+        assertEquals("ACTIVE", response.getStatus());
+        verify(auditLogService).log(any(), any(), eq(AuditAction.USER_REACTIVATED), any(), any(), anyString());
+    }
+
+    @Test
+    @DisplayName("updateUserStatus - Échec si l'ADMIN_PRINCIPAL essaie de se désactiver lui-même")
+    void updateUserStatus_AdminPrincipalSelfDisable_ThrowsException() {
+        UpdateUserStatusRequest request = new UpdateUserStatusRequest();
+        request.setStatus(UserStatus.DISABLED);
+
+        when(userRepository.findById(10L)).thenReturn(Optional.of(adminUser));
+        when(permissionService.hasPermission(adminUser, "DISABLE_USER")).thenReturn(true);
+
+        // adminUser.id == 10L == targetId
+        assertThrows(BusinessRuleException.class,
+                () -> userService.updateUserStatus(adminUser, 10L, request));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("updateUserStatus - Échec si la cible est dans une autre organisation")
+    void updateUserStatus_DifferentOrg_ThrowsException() {
+        Organization otherOrg = Organization.builder().id(99L).name("Autre Org").build();
+        Role agentRoleLocal = Role.builder().id(3L).name(RoleType.AGENT).build();
+        User foreignAgent = User.builder()
+                .id(30L)
+                .email("foreign@test.com")
+                .role(agentRoleLocal)
+                .organization(otherOrg)
+                .status(UserStatus.ACTIVE)
+                .build();
+
+        UpdateUserStatusRequest request = new UpdateUserStatusRequest();
+        request.setStatus(UserStatus.DISABLED);
+
+        when(userRepository.findById(10L)).thenReturn(Optional.of(adminUser));
+        when(userRepository.findById(30L)).thenReturn(Optional.of(foreignAgent));
+        when(permissionService.hasPermission(adminUser, "DISABLE_USER")).thenReturn(true);
+
+        assertThrows(ForbiddenOperationException.class,
+                () -> userService.updateUserStatus(adminUser, 30L, request));
+        verify(userRepository, never()).save(any());
     }
 }

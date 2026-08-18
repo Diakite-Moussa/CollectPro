@@ -10,9 +10,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     req.url.includes('/activate');
 
   const token = authService.getToken();
+  const withPlatformHeader = req.clone({ setHeaders: { 'X-Client-Platform': 'WEB' } });
   const authReq = token && !isAuthRoute
-    ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
-    : req;
+    ? withPlatformHeader.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
+    : withPlatformHeader;
 
   return next(authReq).pipe(
     catchError((error: HttpErrorResponse) => {

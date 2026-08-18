@@ -16,6 +16,7 @@ public class UserResponse {
     private String status;
     private String role;
     private Long organizationId;
+    private String organizationName;
     private LocalDateTime createdAt;
     /** Pour les agents : superviseur affecté (RB-ORG-09). */
     private Long assignedSupervisorId;

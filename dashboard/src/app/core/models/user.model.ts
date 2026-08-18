@@ -26,3 +26,18 @@ export interface AssignSupervisorRequest {
   agentId: number;
   supervisorId: number;
 }
+
+export interface UpdateProfileRequest {
+  firstName: string;
+  lastName: string;
+  phone?: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface UpdateUserStatusRequest {
+  status: 'ACTIVE' | 'DISABLED';
+}

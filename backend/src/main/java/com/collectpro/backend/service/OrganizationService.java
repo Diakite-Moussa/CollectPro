@@ -67,7 +67,7 @@ public class OrganizationService {
 
         userInvitationService.sendInvitation(admin);
 
-        auditLogService.log(
+        auditLogService.logAfterCommit(
                 actor,
                 organization,
                 AuditAction.ORGANIZATION_CREATED,

@@ -88,9 +88,10 @@ class SyncService {
         await _collecteDao.markAsSynced(collecte.id, serverId);
         syncedCount++;
 
+        // Fix #1 : on n'envoie collecteId que si le serveur a retourné un ID valide (> 0).
         await _reportSyncAttempt(
           localReference: collecte.id.toString(),
-          collecteId: serverId,
+          collecteId: serverId > 0 ? serverId : null,
           result: 'SUCCESS',
         );
       } on DioException catch (e) {

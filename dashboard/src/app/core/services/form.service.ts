@@ -10,7 +10,7 @@ import { environment } from '../../../environments/environment';
 export class FormService {
   private readonly apiUrl = `${environment.apiUrl}/forms`;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   getForms(): Observable<FormResponse[]> {
     return this.http.get<FormResponse[]>(this.apiUrl);
@@ -34,5 +34,9 @@ export class FormService {
 
   archiveForm(id: number): Observable<FormResponse> {
     return this.http.post<FormResponse>(`${this.apiUrl}/${id}/archive`, {});
+  }
+
+  getFormVersionById(versionId: number): Observable<FormVersionResponse> {
+    return this.http.get<FormVersionResponse>(`${environment.apiUrl}/form-versions/${versionId}`);
   }
 }

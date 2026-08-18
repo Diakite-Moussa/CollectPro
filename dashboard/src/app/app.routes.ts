@@ -12,6 +12,8 @@ import { ActivationComponent } from './features/auth/activation.component';
 import { AuditLogsComponent } from './features/audit-logs/audit-logs.component';
 import { ForgotPasswordComponent } from './features/auth/forgot-password.component';
 import { ResetPasswordComponent } from './features/auth/reset-password.component';
+import { ProfileComponent } from './features/profile/profile.component';
+import { SyncLogListComponent } from './features/sync-logs/sync-log-list.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -29,7 +31,9 @@ export const routes: Routes = [
       { path: 'users', component: UserListComponent, canActivate: [roleGuard] },
       { path: 'forms', component: FormListComponent, canActivate: [roleGuard] },
       { path: 'collectes', component: CollecteListComponent, canActivate: [roleGuard] },
-      { path: 'audit-logs', component: AuditLogsComponent, canActivate: [roleGuard] }
+      { path: 'sync-logs', component: SyncLogListComponent, canActivate: [roleGuard] },
+      { path: 'audit-logs', component: AuditLogsComponent, canActivate: [roleGuard] },
+      { path: 'profile', component: ProfileComponent }
     ]
   },
   { path: '**', redirectTo: 'login' }

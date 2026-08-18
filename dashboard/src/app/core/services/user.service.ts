@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { AssignSupervisorRequest, CreateUserRequest, UserResponse } from '../models/user.model';
+import { AssignSupervisorRequest, ChangePasswordRequest, CreateUserRequest, UpdateProfileRequest, UpdateUserStatusRequest, UserResponse } from '../models/user.model';
 import { environment } from '../../../environments/environment';
 
 @Injectable({
@@ -26,5 +26,22 @@ export class UserService {
 
   resendInvitation(userId: number): Observable<void> {
     return this.http.post<void>(`${this.apiUrl}/${userId}/resend-invitation`, {});
+  }
+
+  getMe(): Observable<UserResponse> {
+    return this.http.get<UserResponse>(`${this.apiUrl}/me`);
+  }
+
+  updateProfile(request: UpdateProfileRequest): Observable<UserResponse> {
+    return this.http.put<UserResponse>(`${this.apiUrl}/me`, request);
+  }
+
+  changePassword(request: ChangePasswordRequest): Observable<void> {
+    return this.http.put<void>(`${this.apiUrl}/me/password`, request);
+  }
+
+  updateUserStatus(userId: number, status: 'ACTIVE' | 'DISABLED'): Observable<UserResponse> {
+    const body: UpdateUserStatusRequest = { status };
+    return this.http.patch<UserResponse>(`${this.apiUrl}/${userId}/status`, body);
   }
 }

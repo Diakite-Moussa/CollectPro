@@ -5,6 +5,7 @@ import com.collectpro.backend.entity.ActivationToken;
 import com.collectpro.backend.entity.RefreshToken;
 import com.collectpro.backend.entity.User;
 import com.collectpro.backend.enums.AuditAction;
+import com.collectpro.backend.enums.RoleType;
 import com.collectpro.backend.enums.UserStatus;
 import com.collectpro.backend.exception.BusinessRuleException;
 import com.collectpro.backend.exception.InvalidCredentialsException;
@@ -23,6 +24,7 @@ import com.collectpro.backend.entity.PasswordResetToken;
 import com.collectpro.backend.repository.PasswordResetTokenRepository;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -49,6 +51,35 @@ public class AuthService {
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
+
+    private static final Set<RoleType> WEB_ONLY_ROLES = Set.of(
+            RoleType.SUPER_ADMIN, RoleType.ADMIN_PRINCIPAL, RoleType.ADMIN_SECONDAIRE);
+    private static final Set<RoleType> MOBILE_ONLY_ROLES = Set.of(RoleType.AGENT);
+    // SUPERVISOR : acces autorise sur les deux plateformes, aucune restriction.
+
+    /**
+     * Restreint la connexion selon le role de l'utilisateur et la plateforme
+     * d'origine (header X-Client-Platform : "WEB" ou "MOBILE", envoye
+     * automatiquement par le dashboard et l'app mobile). Si le header est
+     * absent (client non a jour ou appel hors navigateur/app), aucune
+     * restriction n'est appliquee.
+     */
+    private void enforcePlatformAccess(User user, String platform) {
+        if (platform == null || platform.isBlank()) {
+            return;
+        }
+        String normalized = platform.trim().toUpperCase();
+        RoleType role = user.getRole().getName();
+
+        if (WEB_ONLY_ROLES.contains(role) && "MOBILE".equals(normalized)) {
+            throw new BusinessRuleException(
+                    "Les comptes administrateurs ne peuvent pas se connecter depuis l'application mobile. Utilisez le dashboard web.");
+        }
+        if (MOBILE_ONLY_ROLES.contains(role) && "WEB".equals(normalized)) {
+            throw new BusinessRuleException(
+                    "Les comptes agents ne peuvent pas se connecter au dashboard web. Utilisez l'application mobile.");
+        }
+    }
 
     public ActivationTokenStatusResponse checkActivationToken(String rawToken) {
 
@@ -109,7 +140,7 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse login(LoginRequest request) {
+    public AuthResponse login(LoginRequest request, String clientPlatform) {
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new InvalidCredentialsException("Email ou mot de passe incorrect"));
@@ -122,11 +153,13 @@ public class AuthService {
             throw new InvalidCredentialsException("Email ou mot de passe incorrect");
         }
 
+        enforcePlatformAccess(user, clientPlatform);
+
         return buildAuthResponse(user);
     }
 
     @Transactional
-    public AuthResponse refresh(RefreshTokenRequest request) {
+    public AuthResponse refresh(RefreshTokenRequest request, String clientPlatform) {
 
         String tokenHash = tokenUtil.hashToken(request.getRefreshToken());
 
@@ -136,6 +169,8 @@ public class AuthService {
         if (!refreshToken.isValid()) {
             throw new InvalidCredentialsException("Refresh token expiré ou révoqué");
         }
+
+        enforcePlatformAccess(refreshToken.getUser(), clientPlatform);
 
         // Rotation : on révoque l'ancien refresh token
         refreshToken.setRevokedAt(LocalDateTime.now());

@@ -357,6 +357,14 @@ export class UserPermissionsDialogComponent {
                         title="Renvoyer l'invitation">
                   <mat-icon>send</mat-icon>
                 </button>
+                <button mat-icon-button
+                        *ngIf="canDisableUser && user.status !== 'INVITED' && !(user.id === currentUserId && user.role === 'ADMIN_PRINCIPAL')"
+                        [color]="user.status === 'ACTIVE' ? 'warn' : 'accent'"
+                        (click)="toggleUserStatus(user)"
+                        [disabled]="togglingStatusId === user.id"
+                        [title]="user.status === 'ACTIVE' ? 'Désactiver le compte' : 'Réactiver le compte'">
+                  <mat-icon>{{ user.status === 'ACTIVE' ? 'block' : 'check_circle' }}</mat-icon>
+                </button>
               </td>
             </ng-container>
 
@@ -426,6 +434,9 @@ export class UserListComponent implements OnInit {
   permissionsUserId: number | null = null;
   canAssignSupervisor = false;
   canManagePermissions = false;
+  canDisableUser = false;
+  currentUserId: number | null = null;
+  togglingStatusId: number | null = null;
 
   constructor(
     private userService: UserService,
@@ -440,6 +451,8 @@ export class UserListComponent implements OnInit {
       || role === 'ADMIN_PRINCIPAL'
       || role === 'ADMIN_SECONDAIRE';
     this.canManagePermissions = role === 'SUPER_ADMIN' || role === 'ADMIN_PRINCIPAL';
+    this.canDisableUser = role === 'SUPER_ADMIN' || role === 'ADMIN_PRINCIPAL' || role === 'ADMIN_SECONDAIRE';
+    this.currentUserId = this.authService.currentUser()?.id ?? null;
     this.loadUsers();
   }
 
@@ -541,6 +554,30 @@ export class UserListComponent implements OnInit {
       error: (err) => {
         this.permissionsUserId = null;
         alert(err?.error?.message || 'Impossible de charger les permissions déléguables');
+      }
+    });
+  }
+
+  toggleUserStatus(user: UserResponse): void {
+    const action = user.status === 'ACTIVE' ? 'désactiver' : 'réactiver';
+    const confirmed = confirm(
+      `Voulez-vous vraiment ${action} le compte de ${user.firstName} ${user.lastName} (${user.email}) ?`
+    );
+    if (!confirmed) return;
+
+    this.togglingStatusId = user.id;
+    const newStatus: 'ACTIVE' | 'DISABLED' = user.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE';
+    this.userService.updateUserStatus(user.id, newStatus).subscribe({
+      next: (updated) => {
+        this.togglingStatusId = null;
+        const idx = this.users.findIndex((u) => u.id === user.id);
+        if (idx !== -1) this.users[idx] = updated;
+        this.users = [...this.users]; // force change detection
+        alert(`Compte ${newStatus === 'DISABLED' ? 'désactivé' : 'réactivé'} : ${user.email}`);
+      },
+      error: (err) => {
+        this.togglingStatusId = null;
+        alert(err?.error?.message || `Erreur lors de la ${action === 'désactiver' ? 'désactivation' : 'réactivation'}`);
       }
     });
   }

@@ -1,7 +1,10 @@
 package com.collectpro.backend.service;
 
 import com.collectpro.backend.dto.AssignSupervisorRequest;
+import com.collectpro.backend.dto.ChangePasswordRequest;
 import com.collectpro.backend.dto.CreateUserRequest;
+import com.collectpro.backend.dto.UpdateProfileRequest;
+import com.collectpro.backend.dto.UpdateUserStatusRequest;
 import com.collectpro.backend.dto.UserResponse;
 import com.collectpro.backend.entity.Role;
 import com.collectpro.backend.entity.SupervisorAgent;
@@ -11,6 +14,7 @@ import com.collectpro.backend.enums.RoleType;
 import com.collectpro.backend.enums.UserStatus;
 import com.collectpro.backend.exception.BusinessRuleException;
 import com.collectpro.backend.exception.ForbiddenOperationException;
+import com.collectpro.backend.exception.InvalidCredentialsException;
 import com.collectpro.backend.exception.ResourceNotFoundException;
 import com.collectpro.backend.repository.RoleRepository;
 import com.collectpro.backend.repository.SupervisorAgentRepository;
@@ -223,6 +227,115 @@ public class UserService {
         );
     }
 
+    /**
+     * RF-USER-11 : désactivation ou réactivation d'un compte utilisateur.
+     * RB-ORG-13 : l'Admin principal ne peut pas désactiver son propre compte.
+     */
+    @Transactional
+    public UserResponse updateUserStatus(User requester, Long targetId, UpdateUserStatusRequest request) {
+        User managedRequester = userRepository.findById(requester.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+
+        User target = userRepository.findById(targetId)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur cible introuvable"));
+
+        if (request.getStatus() == UserStatus.INVITED) {
+            throw new BusinessRuleException("Impossible de repasser un compte au statut INVITED");
+        }
+
+        if (!permissionService.hasPermission(managedRequester, "DISABLE_USER")) {
+            throw new ForbiddenOperationException(
+                    "Le demandeur ne dispose pas de la permission DISABLE_USER");
+        }
+
+        // RB-ORG-06 : même organisation obligatoire, sauf Super Admin
+        if (managedRequester.getRole().getName() != RoleType.SUPER_ADMIN
+                && (target.getOrganization() == null
+                        || managedRequester.getOrganization() == null
+                        || !target.getOrganization().getId().equals(managedRequester.getOrganization().getId()))) {
+            throw new ForbiddenOperationException("Hors de votre organisation");
+        }
+
+        // RB-ORG-13 : un Admin principal ne peut pas se désactiver lui-même
+        if (request.getStatus() == UserStatus.DISABLED
+                && target.getId().equals(managedRequester.getId())
+                && target.getRole().getName() == RoleType.ADMIN_PRINCIPAL) {
+            throw new BusinessRuleException("Un Administrateur principal ne peut pas désactiver son propre compte");
+        }
+
+        if (target.getStatus() == request.getStatus()) {
+            return toResponse(target);
+        }
+
+        target.setStatus(request.getStatus());
+        target = userRepository.save(target);
+
+        auditLogService.log(
+                managedRequester,
+                target.getOrganization(),
+                request.getStatus() == UserStatus.DISABLED ? AuditAction.USER_DISABLED : AuditAction.USER_REACTIVATED,
+                "User",
+                target.getId(),
+                (request.getStatus() == UserStatus.DISABLED ? "Compte désactivé : " : "Compte réactivé : ") + target.getEmail()
+        );
+
+        return toResponse(target);
+    }
+
+    /**
+     * RF-PROFILE-01 : retourne le profil de l'utilisateur courant.
+     * Pas de requête BDD supplémentaire — l'entité est déjà chargée par le filtre JWT.
+     */
+    public UserResponse getCurrentUser(User principal) {
+        return toResponse(principal);
+    }
+
+    /**
+     * RF-PROFILE-02 : mise à jour du profil (firstName, lastName, phone).
+     * Email et rôle ne sont pas modifiables ici.
+     */
+    @Transactional
+    public UserResponse updateProfile(User principal, UpdateProfileRequest request) {
+        User managedUser = userRepository.findById(principal.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+
+        managedUser.setFirstName(request.getFirstName());
+        managedUser.setLastName(request.getLastName());
+        managedUser.setPhone(request.getPhone());
+        managedUser = userRepository.save(managedUser);
+
+        return toResponse(managedUser);
+    }
+
+    /**
+     * RF-PROFILE-03 : changement de mot de passe.
+     * Vérifie l'ancien mot de passe avant d'appliquer le nouveau.
+     */
+    @Transactional
+    public void changePassword(User principal, ChangePasswordRequest request) {
+        User managedUser = userRepository.findById(principal.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), managedUser.getPassword())) {
+            throw new InvalidCredentialsException("Le mot de passe actuel est incorrect");
+        }
+
+        managedUser.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(managedUser);
+    }
+
+    /**
+     * Fix #2 — retourne uniquement les Agents supervisés par ce Superviseur.
+     * Requête ciblée : pas de chargement de tous les users de l'organisation.
+     */
+    @Transactional(readOnly = true)
+    public List<UserResponse> getMyAgents(User supervisor) {
+        List<SupervisorAgent> assignments = supervisorAgentRepository.findBySupervisorId(supervisor.getId());
+        return assignments.stream()
+                .map(sa -> toResponse(sa.getAgent(), sa))
+                .toList();
+    }
+
     private UserResponse toResponse(User user) {
         return toResponse(user, null);
     }
@@ -237,6 +350,7 @@ public class UserService {
                 .status(user.getStatus().name())
                 .role(user.getRole().getName().name())
                 .organizationId(user.getOrganization() != null ? user.getOrganization().getId() : null)
+                .organizationName(user.getOrganization() != null ? user.getOrganization().getName() : null)
                 .createdAt(user.getCreatedAt());
 
         if (assignment != null) {

@@ -28,6 +28,7 @@ class ApiClient {
           baseUrl: kBaseUrl,
           connectTimeout: const Duration(seconds: 30),
           receiveTimeout: const Duration(seconds: 30),
+          headers: {'X-Client-Platform': 'MOBILE'},
         )) {
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {

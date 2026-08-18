@@ -1,8 +1,8 @@
 # 📌 CollectPro — Plateforme Enterprise de Collecte de Données Terrain Offline-First
 
 [![Version](https://img.shields.io/badge/version-1.0.0--RELEASE-blue.svg)](https://github.com/Diakite-Moussa/CollectPro)
-[![Backend](https://img.shields.io/badge/Backend-Spring%20Boot%203-brightgreen.svg)](https://spring.io/projects/spring-boot)
-[![Frontend](https://img.shields.io/badge/Dashboard-Angular%2019-red.svg)](https://angular.dev/)
+[![Backend](https://img.shields.io/badge/Backend-Spring%20Boot%204.1-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![Frontend](https://img.shields.io/badge/Dashboard-Angular%2021-red.svg)](https://angular.dev/)
 [![Mobile](https://img.shields.io/badge/Mobile-Flutter%203-02569B.svg)](https://flutter.dev/)
 [![Database](https://img.shields.io/badge/Database-PostgreSQL%20%7C%20SQLite%2FDrift-blue.svg)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-Proprietary-lightgrey.svg)]()
@@ -22,14 +22,17 @@ La plateforme repose sur une architecture **Offline-First** : les agents saisiss
 - **Collecte Multimédia & GPS** : Capture précise des coordonnées GPS (Geolocator), prises de photos justificatives (appareil photo / galerie) et pièces jointes documentaires.
 - **Sécurité Mobile** : Stockage chiffré des jetons d'accès (`flutter_secure_storage`) et rafraîchissement automatique des sessions JWT.
 
-### 📊 Dashboard Web Administration & Supervision (Angular 19)
+### 📊 Dashboard Web Administration & Supervision (Angular 21)
 - **Constructeur Dynamique de Formulaires** : Création, modélisation visuelle et versionnement des formulaires d'enquête.
-- **Workflow de Supervision (RF-012)** : Validation ou rejet motivé des collectes reçues avec historisation des décisions et commentaires.
+- **Workflow de Supervision (RF-012)** : Validation ou rejet motivé des collectes reçues, affichage des données avec libellés lisibles issus du schéma du formulaire, avec historisation des décisions et commentaires.
+- **Gestion des Comptes & Organisations** : Modification, activation/désactivation des comptes utilisateurs et des organisations, avec règles métier dédiées (ex : un Administrateur principal ne peut pas désactiver son propre compte).
 - **Journal d'Audit Global (`audit_logs`)** : Traçabilité complète des actions sensibles (créations de comptes, modifications d'organisations, validations, réinitialisations de mots de passe).
+- **Journal de Synchronisation (`sync_logs`)** : Suivi des tentatives de synchronisation des agents terrain, filtrable par équipe pour les superviseurs.
+- **Profil Utilisateur** : Consultation/modification des informations personnelles et changement de mot de passe, accessible à tous les rôles.
 - **Statistiques & KPI en Temps Réel** : Tableau de bord unifié par rôle (`SUPER_ADMIN`, `ADMIN_PRINCIPAL`, `SUPERVISOR`).
 - **Gestion Multi-Tenant** : Isolation hermétique des données et utilisateurs par organisation.
 
-### ⚙️ Backend Core API (Spring Boot 3 / Java 17+)
+### ⚙️ Backend Core API (Spring Boot 4.1 / Java 21)
 - **Sécurité RBAC & JWT** : Authentification stateless avec rotation des Refresh Tokens et contrôle d'accès fin par SpEL `@PreAuthorize`.
 - **Migrations de Base de Données (Flyway)** : Évolutions de schéma automatisées et versionnées (`V1` à `V4`).
 - **Pattern Journal d'Audit Isolation (`REQUIRES_NEW`)** : Enregistrement d'audit indépendant empêchant l'annulation des logs en cas d'incident métier.
@@ -48,7 +51,7 @@ graph TD
 
     subgraph Infrastruture Serveur Cloud
         C -->|REST API / HTTPS| D[Nginx Reverse Proxy]
-        E[Angular 19 Dashboard] -->|HTTPS| D
+        E[Angular 21 Dashboard] -->|HTTPS| D
         D -->|Spring Security / JWT| F[Spring Boot Backend]
         F -->|Flyway / JPA| G[(PostgreSQL DB)]
         F -->|Uploads Storage| H[/Volume Médias Persistant/]
@@ -73,15 +76,15 @@ graph TD
 
 ```text
 CollectPro/
-├── backend/                  # API REST Spring Boot 3 (Java 17/21, PostgreSQL, Flyway)
+├── backend/                  # API REST Spring Boot 4.1 (Java 21, PostgreSQL, Flyway)
 │   ├── src/main/java/        # Modèle, Contrôleurs, Services, Sécurité JWT & Audit
 │   ├── src/main/resources/   # App YML (dev/prod), Migrations Flyway db/migration (V1..V4)
 │   └── Dockerfile            # Image Docker multi-stage pour le backend
-├── dashboard/                # Application Web Angular 19 (Angular Material, Signals, RxJS)
+├── dashboard/                # Application Web Angular 21 (Angular Material, Signals, RxJS)
 │   ├── src/app/core/         # Services HTTP, Modèles, Intercepteurs JWT
 │   ├── src/app/features/     # Composants d'écrans (Form Builder, Audit Logs, Collectes)
 │   └── src/environments/     # Configurations d'environnements (environment.ts / environment.prod.ts)
-├── mobile/                   # Application Mobile Flutter 3 (Android & iOS)
+├── mobile/                   # Application Mobile Flutter 3 (Android uniquement en V1)
 │   ├── lib/data/local/       # SQLite & Accessors DAO (Drift)
 │   ├── lib/screens/          # Écrans de saisie, de consultation et de synchro
 │   └── lib/services/         # Client Dio, Moteur de synchro, Géolocalisation & Médias
@@ -96,8 +99,8 @@ CollectPro/
 ## 🚀 Démarrage Rapide (Environnement de Développement)
 
 ### 1. Prérequis
-- **Java 17+** & **Maven 3.9+**
-- **Node.js 18+** & **Angular CLI 19**
+- **Java 21+** & **Maven 3.9+**
+- **Node.js 18+** & **Angular CLI 21**
 - **Flutter SDK 3.22+**
 - **PostgreSQL 16** (ou Docker)
 

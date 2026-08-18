@@ -1,11 +1,11 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, Inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatDialogModule, MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MatDialogModule, MatDialog, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatChipsModule } from '@angular/material/chips';
@@ -86,6 +86,64 @@ export class OrganizationDialogComponent {
 }
 
 @Component({
+  selector: 'app-edit-organization-dialog',
+  standalone: true,
+  imports: [
+    CommonModule,
+    FormsModule,
+    ReactiveFormsModule,
+    MatDialogModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatButtonModule
+  ],
+  template: `
+    <h2 mat-dialog-title>Modifier l'Organisation</h2>
+    <mat-dialog-content>
+      <form [formGroup]="editForm" class="dialog-form">
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Nom de l'organisation</mat-label>
+          <input matInput formControlName="name" required>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Description</mat-label>
+          <textarea matInput formControlName="description" rows="3"></textarea>
+        </mat-form-field>
+      </form>
+    </mat-dialog-content>
+    <mat-dialog-actions align="end">
+      <button mat-button mat-dialog-close>Annuler</button>
+      <button mat-raised-button color="primary" [disabled]="editForm.invalid" (click)="onSave()">Enregistrer</button>
+    </mat-dialog-actions>
+  `,
+  styles: [`
+    .dialog-form { display: flex; flex-direction: column; gap: 0.5rem; width: 400px; }
+    .w-full { width: 100%; }
+  `]
+})
+export class EditOrganizationDialogComponent {
+  editForm: FormGroup;
+  private dialogRef = inject(MatDialogRef<EditOrganizationDialogComponent>);
+
+  constructor(
+    @Inject(MAT_DIALOG_DATA) public data: { organization: OrganizationResponse },
+    private fb: FormBuilder
+  ) {
+    this.editForm = this.fb.group({
+      name: [data.organization.name, Validators.required],
+      description: [data.organization.description ?? '']
+    });
+  }
+
+  onSave(): void {
+    if (this.editForm.valid) {
+      this.dialogRef.close(this.editForm.value);
+    }
+  }
+}
+
+@Component({
   selector: 'app-organization-list',
   standalone: true,
   imports: [
@@ -138,6 +196,25 @@ export class OrganizationDialogComponent {
               </td>
             </ng-container>
 
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef> Action </th>
+              <td mat-cell *matCellDef="let org">
+                <button mat-icon-button color="primary"
+                        (click)="openEditDialog(org)"
+                        [disabled]="editingId === org.id"
+                        title="Modifier l'organisation">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button
+                        [color]="org.status === 'ACTIVE' ? 'warn' : 'accent'"
+                        (click)="toggleOrganizationStatus(org)"
+                        [disabled]="togglingStatusId === org.id"
+                        [title]="org.status === 'ACTIVE' ? 'Désactiver' : 'Réactiver'">
+                  <mat-icon>{{ org.status === 'ACTIVE' ? 'block' : 'check_circle' }}</mat-icon>
+                </button>
+              </td>
+            </ng-container>
+
             <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
             <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
           </table>
@@ -161,7 +238,9 @@ export class OrganizationDialogComponent {
 })
 export class OrganizationListComponent implements OnInit {
   organizations: OrganizationResponse[] = [];
-  displayedColumns = ['id', 'name', 'admin', 'status'];
+  displayedColumns = ['id', 'name', 'admin', 'status', 'actions'];
+  editingId: number | null = null;
+  togglingStatusId: number | null = null;
 
   constructor(
     private orgService: OrganizationService,
@@ -187,6 +266,52 @@ export class OrganizationListComponent implements OnInit {
           next: () => this.loadOrganizations(),
           error: (err) => alert(err?.error?.message || 'Erreur lors de la création')
         });
+      }
+    });
+  }
+
+  openEditDialog(org: OrganizationResponse): void {
+    const dialogRef = this.dialog.open(EditOrganizationDialogComponent, {
+      width: '450px',
+      data: { organization: org }
+    });
+    dialogRef.afterClosed().subscribe((result) => {
+      if (!result) return;
+      this.editingId = org.id;
+      this.orgService.updateOrganization(org.id, result).subscribe({
+        next: (updated) => {
+          this.editingId = null;
+          const idx = this.organizations.findIndex((o) => o.id === org.id);
+          if (idx !== -1) this.organizations[idx] = updated;
+          this.organizations = [...this.organizations];
+        },
+        error: (err) => {
+          this.editingId = null;
+          alert(err?.error?.message || 'Erreur lors de la modification');
+        }
+      });
+    });
+  }
+
+  toggleOrganizationStatus(org: OrganizationResponse): void {
+    const action = org.status === 'ACTIVE' ? 'désactiver' : 'réactiver';
+    const confirmed = confirm(
+      `Voulez-vous vraiment ${action} l'organisation "${org.name}" ?`
+    );
+    if (!confirmed) return;
+
+    this.togglingStatusId = org.id;
+    const newStatus: 'ACTIVE' | 'INACTIVE' = org.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    this.orgService.updateOrganizationStatus(org.id, newStatus).subscribe({
+      next: (updated) => {
+        this.togglingStatusId = null;
+        const idx = this.organizations.findIndex((o) => o.id === org.id);
+        if (idx !== -1) this.organizations[idx] = updated;
+        this.organizations = [...this.organizations];
+      },
+      error: (err) => {
+        this.togglingStatusId = null;
+        alert(err?.error?.message || `Erreur lors de la ${action === 'désactiver' ? 'désactivation' : 'réactivation'}`);
       }
     });
   }
