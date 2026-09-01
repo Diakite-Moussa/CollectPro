@@ -39,4 +39,10 @@ public class Organization {
             this.status = OrganizationStatus.ACTIVE;
         }
     }
+
+    @Column(name = "logo_url")
+    private String logoUrl;
+
+    @Column(name = "logo_content_type")
+    private String logoContentType;
 }

@@ -23,6 +23,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -71,6 +72,6 @@ class StatisticsControllerSecurityTest {
         mockMvc.perform(get("/statistics").principal(agentAuth))
                 .andExpect(status().isForbidden());
 
-        verify(statisticsService, never()).getStatistics(any());
+        verify(statisticsService, never()).getStatistics(any(), anyInt());
     }
 }

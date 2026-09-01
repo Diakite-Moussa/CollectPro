@@ -26,4 +26,6 @@ export interface CollecteResponse {
   validatedAt?: string;
   createdAt: string;
   updatedAt?: string;
+  missionId?: number;
+  outsideMissionZone?: boolean | null;
 }

@@ -10,6 +10,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatDialogModule, MatDialog, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTabsModule, MatTabChangeEvent } from '@angular/material/tabs';
+import { MapViewComponent, MapMarker } from '../../shared/map-view/map-view.component';
 import { CollecteService } from '../../core/services/collecte.service';
 import { AuthService } from '../../core/services/auth.service';
 import { FileService } from '../../core/services/file.service';
@@ -215,7 +217,9 @@ export class RejectDialogComponent {
     MatButtonModule,
     MatIconModule,
     MatChipsModule,
-    MatDialogModule
+    MatDialogModule,
+    MatTabsModule,
+    MapViewComponent
   ],
   template: `
     <div class="collecte-container">
@@ -224,8 +228,22 @@ export class RejectDialogComponent {
           <h2>Collectes Terrain Synchronisées</h2>
           <p class="subtitle">Consulter et valider les soumissions reçues des agents terrain</p>
         </div>
+        <div class="export-actions">
+          <button mat-stroked-button color="primary" (click)="exportCsv()" [disabled]="isExportingCsv">
+            <mat-icon *ngIf="!isExportingCsv">description</mat-icon>
+            <mat-icon *ngIf="isExportingCsv">hourglass_top</mat-icon>
+            Exporter CSV
+          </button>
+          <button mat-raised-button color="primary" (click)="exportExcel()" [disabled]="isExportingExcel">
+            <mat-icon *ngIf="!isExportingExcel">table_view</mat-icon>
+            <mat-icon *ngIf="isExportingExcel">hourglass_top</mat-icon>
+            Exporter Excel (.xlsx)
+          </button>
+        </div>
       </div>
 
+      <mat-tab-group (selectedTabChange)="onTabChange($event)">
+        <mat-tab label="Liste">
       <mat-card class="table-card">
         <mat-card-content>
           <table mat-table [dataSource]="collectes" class="w-full">
@@ -246,6 +264,9 @@ export class RejectDialogComponent {
                   <mat-icon inline>location_on</mat-icon> {{ row.latitude | number:'1.4-4' }}, {{ row.longitude | number:'1.4-4' }}
                 </span>
                 <span *ngIf="!row.latitude" class="text-gray-400">Non disponible</span>
+                <mat-icon *ngIf="row.outsideMissionZone" inline color="warn" class="alert-icon" title="Collecte hors de la zone de mission">
+                  warning
+                </mat-icon>
               </td>
             </ng-container>
 
@@ -285,21 +306,57 @@ export class RejectDialogComponent {
           </table>
         </mat-card-content>
       </mat-card>
+        </mat-tab>
+
+        <mat-tab label="Carte">
+          <mat-card class="table-card">
+            <mat-card-content>
+              <app-map-view
+                [markers]="collecteMarkers"
+                [defaultCenter]="[12.6392, -8.0029]"
+                [defaultZoom]="6">
+              </app-map-view>
+              <p *ngIf="!collecteMarkers.length" class="empty-state">
+                Aucune collecte géolocalisée
+              </p>
+            </mat-card-content>
+          </mat-card>
+        </mat-tab>
+      </mat-tab-group>
     </div>
   `,
   styles: [`
-    .header-actions { margin-bottom: 1.5rem; h2 { margin: 0; font-weight: 700; } .subtitle { margin: 0; color: #64748b; } }
+    .header-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+      h2 { margin: 0; font-weight: 700; }
+      .subtitle { margin: 0; color: #64748b; }
+    }
+    .export-actions {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
     .table-card { border-radius: 12px; }
     .w-full { width: 100%; }
     .font-semibold { font-weight: 600; }
     .gps-badge { display: inline-flex; align-items: center; gap: 2px; background: #eff6ff; color: #2563eb; padding: 2px 8px; border-radius: 6px; font-size: 0.8rem; }
+    .alert-icon { margin-left: 4px; vertical-align: middle; }
+    .empty-state { text-align: center; color: #94a3b8; padding: 2rem; }
   `]
 })
 export class CollecteListComponent implements OnInit {
   collectes: CollecteResponse[] = [];
+  collecteMarkers: MapMarker[] = [];
   displayedColumns = ['id', 'agent', 'coords', 'status', 'createdAt', 'actions'];
   processingId: number | null = null;
   isSupervisor = false;
+  isExportingCsv = false;
+  isExportingExcel = false;
 
   constructor(
     private collecteService: CollecteService,
@@ -317,9 +374,41 @@ export class CollecteListComponent implements OnInit {
       ? this.collecteService.getTeamCollectes()
       : this.collecteService.getOrganizationCollectes();
     request$.subscribe({
-      next: (data) => this.collectes = data,
+      next: (data) => {
+        this.collectes = data;
+        this.collecteMarkers = this.buildMarkers(data);
+      },
       error: (err) => console.error(err)
     });
+  }
+
+  private buildMarkers(collectes: CollecteResponse[]): MapMarker[] {
+    return collectes
+      .filter(c => c.latitude != null && c.longitude != null)
+      .map(c => ({
+        id: c.id,
+        lat: c.latitude!,
+        lng: c.longitude!,
+        label: this.buildMarkerLabel(c),
+        color: c.outsideMissionZone ? '#dc2626' : this.markerColor(c.status)
+      }));
+  }
+
+  private buildMarkerLabel(c: CollecteResponse): string {
+    const base = `#${c.id} — ${c.agent.firstName} ${c.agent.lastName} — ${c.status}`;
+    return c.outsideMissionZone ? `${base} ⚠️ Hors zone de mission` : base;
+  }
+
+  private markerColor(status: string): string {
+    if (status === 'VALIDATED') return '#22c55e';
+    if (status === 'REJECTED') return '#ef4444';
+    return '#f59e0b'; // PENDING_VALIDATION
+  }
+
+  onTabChange(event: MatTabChangeEvent): void {
+    if (event.tab.textLabel === 'Carte') {
+      setTimeout(() => window.dispatchEvent(new Event('resize')), 0);
+    }
   }
 
   openDetail(collecte: CollecteResponse): void {
@@ -363,5 +452,35 @@ export class CollecteListComponent implements OnInit {
       case 'REJECTED': return 'warn';
       default: return 'primary';
     }
+  }
+
+  exportCsv(): void {
+    this.isExportingCsv = true;
+    this.collecteService.exportCsv().subscribe({
+      next: (blob) => {
+        this.isExportingCsv = false;
+        const dateStr = new Date().toISOString().slice(0, 10);
+        this.collecteService.triggerBrowserDownload(blob, `collectes_export_${dateStr}.csv`);
+      },
+      error: (err) => {
+        this.isExportingCsv = false;
+        alert(err?.error?.message || "Erreur lors de l'export CSV");
+      }
+    });
+  }
+
+  exportExcel(): void {
+    this.isExportingExcel = true;
+    this.collecteService.exportExcel().subscribe({
+      next: (blob) => {
+        this.isExportingExcel = false;
+        const dateStr = new Date().toISOString().slice(0, 10);
+        this.collecteService.triggerBrowserDownload(blob, `collectes_export_${dateStr}.xlsx`);
+      },
+      error: (err) => {
+        this.isExportingExcel = false;
+        alert(err?.error?.message || "Erreur lors de l'export Excel");
+      }
+    });
   }
 }

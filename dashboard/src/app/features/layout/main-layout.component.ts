@@ -82,6 +82,11 @@ import { ROUTE_ROLES } from '../../core/constants/route-roles';
               <span matListItemTitle>Collectes Terrain</span>
             </a>
 
+            <a mat-list-item routerLink="/missions" routerLinkActive="active-link" *ngIf="canAccess('missions')">
+              <mat-icon matListItemIcon>flag</mat-icon>
+              <span matListItemTitle>Missions</span>
+            </a>
+
             <a mat-list-item routerLink="/sync-logs" routerLinkActive="active-link" *ngIf="canAccess('sync-logs')">
               <mat-icon matListItemIcon>sync</mat-icon>
               <span matListItemTitle>Synchronisations</span>

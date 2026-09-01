@@ -13,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/organizations")
@@ -52,5 +54,14 @@ public class OrganizationController {
             @PathVariable Long id,
             @Valid @RequestBody UpdateOrganizationStatusRequest request) {
         return ResponseEntity.ok(organizationService.updateOrganizationStatus(principal.getUser(), id, request));
+    }
+
+    @PutMapping(value = "/{id}/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("@securityAuth.isSuperAdmin(authentication)")
+    public ResponseEntity<OrganizationResponse> updateLogo(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(organizationService.updateLogo(principal.getUser(), id, file));
     }
 }

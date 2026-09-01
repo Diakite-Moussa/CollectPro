@@ -11,6 +11,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatChipsModule } from '@angular/material/chips';
 import { OrganizationService } from '../../core/services/organization.service';
 import { OrganizationResponse } from '../../core/models/organization.model';
+import { environment } from '../../../environments/environment';
+import { ReportHistoryDialogComponent } from '../reports/report-history-dialog.component';
 
 @Component({
   selector: 'app-organization-dialog',
@@ -170,6 +172,17 @@ export class EditOrganizationDialogComponent {
       <mat-card class="table-card">
         <mat-card-content>
           <table mat-table [dataSource]="organizations" class="w-full">
+            <ng-container matColumnDef="logo">
+              <th mat-header-cell *matHeaderCellDef> Logo </th>
+              <td mat-cell *matCellDef="let org">
+                <img *ngIf="org.logoUrl" [src]="getLogoUrl(org)" class="org-logo" alt="Logo" (error)="onImgError($event)">
+                <button mat-icon-button (click)="fileInput.click()" title="Changer le logo" [disabled]="uploadingLogoId === org.id">
+                  <mat-icon>image</mat-icon>
+                </button>
+                <input #fileInput type="file" accept="image/png,image/jpeg" hidden (change)="onLogoSelected($event, org)">
+              </td>
+            </ng-container>
+
             <ng-container matColumnDef="id">
               <th mat-header-cell *matHeaderCellDef> ID </th>
               <td mat-cell *matCellDef="let org"> #{{ org.id }} </td>
@@ -199,6 +212,11 @@ export class EditOrganizationDialogComponent {
             <ng-container matColumnDef="actions">
               <th mat-header-cell *matHeaderCellDef> Action </th>
               <td mat-cell *matCellDef="let org">
+                <button mat-icon-button color="accent"
+                        (click)="openOrgReports(org)"
+                        title="Rapports PDF de l'organisation">
+                  <mat-icon>analytics</mat-icon>
+                </button>
                 <button mat-icon-button color="primary"
                         (click)="openEditDialog(org)"
                         [disabled]="editingId === org.id"
@@ -234,13 +252,15 @@ export class EditOrganizationDialogComponent {
     .table-card { border-radius: 12px; }
     .w-full { width: 100%; }
     .font-semibold { font-weight: 600; }
+    .org-logo { width: 32px; height: 32px; object-fit: contain; border-radius: 4px; vertical-align: middle; margin-right: 4px; }
   `]
 })
 export class OrganizationListComponent implements OnInit {
   organizations: OrganizationResponse[] = [];
-  displayedColumns = ['id', 'name', 'admin', 'status', 'actions'];
+  displayedColumns = ['logo', 'id', 'name', 'admin', 'status', 'actions'];
   editingId: number | null = null;
   togglingStatusId: number | null = null;
+  uploadingLogoId: number | null = null;
 
   constructor(
     private orgService: OrganizationService,
@@ -312,6 +332,49 @@ export class OrganizationListComponent implements OnInit {
       error: (err) => {
         this.togglingStatusId = null;
         alert(err?.error?.message || `Erreur lors de la ${action === 'désactiver' ? 'désactivation' : 'réactivation'}`);
+      }
+    });
+  }
+
+  onLogoSelected(event: Event, org: OrganizationResponse): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    this.uploadingLogoId = org.id;
+    this.orgService.uploadLogo(org.id, file).subscribe({
+      next: (updated) => {
+        this.uploadingLogoId = null;
+        const idx = this.organizations.findIndex((o) => o.id === org.id);
+        if (idx !== -1) this.organizations[idx] = updated;
+        this.organizations = [...this.organizations];
+        input.value = '';
+      },
+      error: (err) => {
+        this.uploadingLogoId = null;
+        alert(err?.error?.message || 'Erreur lors de l\'upload du logo');
+        input.value = '';
+      }
+    });
+  }
+
+  getLogoUrl(org: OrganizationResponse): string | null {
+    if (!org.logoUrl) return null;
+    return org.logoUrl.startsWith('http') ? org.logoUrl : `${environment.apiUrl}${org.logoUrl}`;
+  }
+
+  onImgError(event: Event): void {
+    (event.target as HTMLElement).style.display = 'none';
+  }
+
+  openOrgReports(org: OrganizationResponse): void {
+    this.dialog.open(ReportHistoryDialogComponent, {
+      width: '750px',
+      data: {
+        title: org.name,
+        type: 'ORGANIZATION',
+        targetId: org.id,
+        canGenerate: true
       }
     });
   }

@@ -1,3 +1,17 @@
+export interface DailyCountEntry {
+  date: string;
+  count: number;
+}
+
+export interface AgentRejectionRate {
+  agentId: number;
+  firstName: string;
+  lastName: string;
+  totalCount: number;
+  rejectedCount: number;
+  rejectionRatePercent: number;
+}
+
 export interface StatisticsResponse {
   scope: 'GLOBAL' | 'ORGANIZATION' | 'TEAM';
   organizationId?: number;
@@ -18,4 +32,8 @@ export interface StatisticsResponse {
   pendingCollectes: number;
   validatedCollectes: number;
   rejectedCollectes: number;
+
+  collecteTrend: DailyCountEntry[];
+  rejectionByAgent: AgentRejectionRate[];
+  avgValidationTimeHours: number | null;
 }

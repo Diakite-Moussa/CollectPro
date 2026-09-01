@@ -25,4 +25,11 @@ class FormService {
     }
     return FormVersionModel.fromJson(data.first as Map<String, dynamic>);
   }
+
+  /// Récupère une version spécifique d'un formulaire par son id
+  /// (GET /form-versions/{id}).
+  Future<FormVersionModel> getFormVersion(int versionId) async {
+    final response = await _apiClient.dio.get('/form-versions/$versionId');
+    return FormVersionModel.fromJson(response.data as Map<String, dynamic>);
+  }
 }

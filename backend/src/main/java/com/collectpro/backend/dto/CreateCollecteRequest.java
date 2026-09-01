@@ -18,4 +18,6 @@ public class CreateCollecteRequest {
     private Double latitude;
 
     private Double longitude;
+
+    private Long missionId;
 }

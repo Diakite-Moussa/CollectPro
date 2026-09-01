@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.collectpro.backend.service.OrganizationService;
 
 @RestController
 @RequestMapping("/files")
@@ -22,6 +23,7 @@ public class FileController {
 
     private final CollecteService collecteService;
     private final CollecteAttachmentRepository attachmentRepository;
+    private final OrganizationService organizationService;
 
     @GetMapping("/attachments/{id}")
     @PreAuthorize("isAuthenticated()")
@@ -37,5 +39,13 @@ public class FileController {
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "inline; filename=\"" + attachment.getOriginalFilename() + "\"")
                 .body(resource);
+    }
+
+    @GetMapping("/organizations/{id}/logo")
+    public ResponseEntity<Resource> downloadOrganizationLogo(@PathVariable Long id) {
+        OrganizationService.LogoFile logo = organizationService.loadLogoFile(id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(logo.contentType()))
+                .body(logo.resource());
     }
 }

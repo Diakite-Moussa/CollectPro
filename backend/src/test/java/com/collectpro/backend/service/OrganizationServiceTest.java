@@ -53,6 +53,9 @@ class OrganizationServiceTest {
     @Mock
     private AuditLogService auditLogService;
 
+    @Mock
+    private FileStorageService fileStorageService;
+
     @InjectMocks
     private OrganizationService organizationService;
 
@@ -106,7 +109,7 @@ class OrganizationServiceTest {
         assertEquals(100L, response.getId());
         assertEquals("ONG Santé Sénégal", response.getName());
         verify(userInvitationService).sendInvitation(any(User.class));
-        verify(auditLogService).log(
+        verify(auditLogService).logAfterCommit(
                 eq(superAdmin),
                 any(Organization.class),
                 eq(AuditAction.ORGANIZATION_CREATED),

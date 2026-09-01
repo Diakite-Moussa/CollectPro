@@ -61,6 +61,7 @@ class SyncService {
           'dataJson': jsonEncode(dataPayload),
           'latitude': collecte.latitude,
           'longitude': collecte.longitude,
+          'missionId': ?collecte.missionId,
         };
 
         final formData = FormData.fromMap({
@@ -139,9 +140,9 @@ class SyncService {
     try {
       await _apiClient.dio.post('/sync-logs', data: {
         'localReference': localReference,
-        if (collecteId != null) 'collecteId': collecteId,
+        'collecteId': ?collecteId,
         'result': result,
-        if (errorMessage != null) 'errorMessage': errorMessage,
+        'errorMessage': ?errorMessage,
       });
     } catch (_) {
       // Silencieux : le sync-log est un journal secondaire, pas critique.
@@ -180,6 +181,55 @@ class SyncService {
         }
       }
     } catch (_) {}
+  }
+
+  /// Récupère l'état de validation de toutes les collectes de l'agent
+  /// (GET /collectes/mine) et met à jour les lignes locales correspondantes.
+  Future<void> pullValidationStatuses() async {
+    try {
+      final response = await _apiClient.dio.get('/collectes/mine');
+      final data = response.data as List;
+
+      for (final item in data) {
+        final json = item as Map<String, dynamic>;
+        final serverId = json['id'] as int?;
+        if (serverId == null) continue;
+
+        final status = json['status'] as String?;
+        if (status == null) continue;
+
+        final validatedBy = json['validatedBy'] as Map<String, dynamic>?;
+        final validatedByName = validatedBy != null
+            ? '${validatedBy['firstName']} ${validatedBy['lastName']}'
+            : null;
+
+        await _collecteDao.updateValidationStatus(
+          serverId: serverId,
+          serverStatus: status,
+          validationComment: json['validationComment'] as String?,
+          validatedByName: validatedByName,
+          validatedAt: json['validatedAt'] != null
+              ? DateTime.parse(json['validatedAt'] as String)
+              : null,
+        );
+      }
+    } catch (_) {
+      // Best-effort : un échec de pull ne doit pas bloquer le reste de l'app.
+    }
+  }
+
+  /// Soumet les modifications d'une collecte rejetée au serveur.
+  Future<void> resubmitCollecte({
+    required int serverId,
+    required String dataJson,
+    double? latitude,
+    double? longitude,
+  }) async {
+    await _apiClient.dio.put('/collectes/$serverId/resubmit', data: {
+      'dataJson': dataJson,
+      'latitude': ?latitude,
+      'longitude': ?longitude,
+    });
   }
 
   String _extractErrorMessage(DioException e) {

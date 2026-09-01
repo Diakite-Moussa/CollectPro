@@ -115,7 +115,7 @@ class CollecteDetailScreen extends ConsumerWidget {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            _StatusBadge(status: c.localStatus),
+                            _StatusBadge(status: c.serverStatus ?? c.localStatus),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -181,6 +181,42 @@ class CollecteDetailScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
+
+                if (c.serverStatus == 'REJECTED' && c.validationComment != null) ...[
+                  const SizedBox(height: 16),
+                  Card(
+                    elevation: 1,
+                    color: Colors.deepOrange.shade50,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.comment, color: Colors.deepOrange.shade700),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Motif du rejet${c.validatedByName != null ? ' — ${c.validatedByName}' : ''}',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.deepOrange.shade900,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            c.validationComment!,
+                            style: TextStyle(color: Colors.deepOrange.shade900),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
 
                 const SizedBox(height: 16),
 
@@ -384,7 +420,24 @@ class CollecteDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 24),
 
                 // Boutons d'action
-                if (c.localStatus == 'SYNC_FAILED' || c.localStatus == 'DRAFT' || c.localStatus == 'PENDING_SYNC') ...[
+                if (c.serverStatus == 'REJECTED') ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.replay),
+                      label: const Text('Corriger et renvoyer'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepOrange,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        context.push('/forms/edit-rejected/${c.id}');
+                      },
+                    ),
+                  ),
+                ] else if (c.localStatus == 'SYNC_FAILED' || c.localStatus == 'DRAFT' || c.localStatus == 'PENDING_SYNC') ...[
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
@@ -481,6 +534,24 @@ class _StatusBadge extends StatelessWidget {
         textColor = Colors.red.shade900;
         icon = Icons.error_outline;
         label = 'ÉCHEC SYNCHRO';
+        break;
+      case 'PENDING_VALIDATION':
+        bgColor = Colors.blue.shade50;
+        textColor = Colors.blue.shade800;
+        icon = Icons.hourglass_top;
+        label = 'EN ATTENTE DE VALIDATION';
+        break;
+      case 'VALIDATED':
+        bgColor = Colors.teal.shade100;
+        textColor = Colors.teal.shade900;
+        icon = Icons.verified;
+        label = 'VALIDÉE';
+        break;
+      case 'REJECTED':
+        bgColor = Colors.deepOrange.shade100;
+        textColor = Colors.deepOrange.shade900;
+        icon = Icons.cancel_outlined;
+        label = 'REJETÉE';
         break;
       default:
         bgColor = Colors.grey.shade200;

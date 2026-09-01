@@ -122,6 +122,18 @@ class HomeScreen extends ConsumerWidget {
             const SizedBox(height: 12),
 
             OutlinedButton.icon(
+              icon: const Icon(Icons.flag_outlined),
+              label: const Text('Mes missions'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => context.push('/missions'),
+            ),
+
+            const SizedBox(height: 12),
+
+            OutlinedButton.icon(
               icon: const Icon(Icons.format_list_bulleted),
               label: const Text('Liste des formulaires téléchargeables'),
               style: OutlinedButton.styleFrom(

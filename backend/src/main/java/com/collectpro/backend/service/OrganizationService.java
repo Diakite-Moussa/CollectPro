@@ -18,9 +18,16 @@ import com.collectpro.backend.repository.RoleRepository;
 import com.collectpro.backend.repository.UserRepository;
 import com.collectpro.backend.security.TokenUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +40,7 @@ public class OrganizationService {
     private final PasswordEncoder passwordEncoder;
     private final UserInvitationService userInvitationService;
     private final AuditLogService auditLogService;
+    private final FileStorageService fileStorageService;
 
     @Transactional
     public OrganizationResponse createOrganizationWithPrincipalAdmin(User actor, CreateOrganizationRequest request) {
@@ -80,7 +88,7 @@ public class OrganizationService {
     }
 
     @Transactional(readOnly = true)
-    public java.util.List<OrganizationResponse> getAllOrganizations() {
+    public List<OrganizationResponse> getAllOrganizations() {
         return organizationRepository.findAll().stream()
                 .map(org -> {
                     User principalAdmin = userRepository
@@ -138,6 +146,70 @@ public class OrganizationService {
         return toResponse(organization, principalAdmin);
     }
 
+    @Transactional
+    public OrganizationResponse updateLogo(User actor, Long id, MultipartFile file) {
+        Organization organization = organizationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Organisation introuvable"));
+
+        if (file.isEmpty()) {
+            throw new BusinessRuleException("Fichier vide");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !(contentType.equals("image/png") || contentType.equals("image/jpeg"))) {
+            throw new BusinessRuleException("Format de logo non supporté (PNG ou JPEG uniquement)");
+        }
+
+        try {
+            FileStorageService.StoredFile stored = fileStorageService.saveOrganizationLogo(id, file);
+            organization.setLogoUrl(stored.storedFilename());
+            organization.setLogoContentType(stored.contentType());
+        } catch (IOException e) {
+            throw new BusinessRuleException("Erreur lors de l'enregistrement du logo");
+        }
+
+        organization = organizationRepository.save(organization);
+
+        auditLogService.log(
+                actor,
+                organization,
+                AuditAction.ORGANIZATION_UPDATED,
+                "Organization",
+                organization.getId(),
+                "Mise à jour du logo de l'organisation '" + organization.getName() + "'"
+        );
+
+        User principalAdmin = userRepository
+                .findByOrganizationIdAndRole_Name(organization.getId(), RoleType.ADMIN_PRINCIPAL)
+                .orElse(null);
+        return toResponse(organization, principalAdmin);
+    }
+
+    @Transactional(readOnly = true)
+    public LogoFile loadLogoFile(Long organizationId) {
+        Organization organization = organizationRepository.findById(organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Organisation introuvable"));
+        if (organization.getLogoUrl() == null) {
+            throw new ResourceNotFoundException("Logo non défini pour cette organisation");
+        }
+        try {
+            Path path = fileStorageService.resolvePath(organization.getLogoUrl());
+            Resource resource = new UrlResource(path.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new ResourceNotFoundException("Fichier introuvable sur le disque");
+            }
+            String contentType = organization.getLogoContentType() != null
+                    ? organization.getLogoContentType()
+                    : "application/octet-stream";
+            return new LogoFile(resource, contentType);
+        } catch (ResourceNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ResourceNotFoundException("Fichier introuvable");
+        }
+    }
+
+    public record LogoFile(Resource resource, String contentType) {}
+
     private OrganizationResponse toResponse(Organization organization, User admin) {
         return OrganizationResponse.builder()
                 .id(organization.getId())
@@ -145,6 +217,7 @@ public class OrganizationService {
                 .description(organization.getDescription())
                 .status(organization.getStatus())
                 .createdAt(organization.getCreatedAt())
+                .logoUrl(organization.getLogoUrl() != null ? "/files/organizations/" + organization.getId() + "/logo" : null)
                 .principalAdmin(admin == null ? null : OrganizationResponse.UserSummary.builder()
                         .id(admin.getId())
                         .firstName(admin.getFirstName())

@@ -23,4 +23,13 @@ public interface SyncLogRepository extends JpaRepository<SyncLog, Long> {
 
     /** Sync-logs des agents supervisés — périmètre Superviseur. */
     Page<SyncLog> findByAgentInOrderByCreatedAtDesc(List<User> agents, Pageable pageable);
+
+    // ---- Variantes filtrées par agentId (appliquées en base, pas en mémoire) ----
+
+    /** SUPER_ADMIN + filtre agentId. */
+    Page<SyncLog> findByAgent_IdOrderByCreatedAtDesc(Long agentId, Pageable pageable);
+
+    /** Admin + filtre agentId (garantit que l'agent appartient bien à l'organisation). */
+    Page<SyncLog> findByAgent_OrganizationIdAndAgent_IdOrderByCreatedAtDesc(
+            Long organizationId, Long agentId, Pageable pageable);
 }

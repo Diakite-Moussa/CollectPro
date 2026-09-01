@@ -71,32 +71,37 @@ public class SyncLogService {
 
         Page<SyncLog> page;
         switch (role) {
-            case SUPER_ADMIN -> page = syncLogRepository.findAllByOrderByCreatedAtDesc(pageable);
+            case SUPER_ADMIN -> page = (agentId != null)
+                    ? syncLogRepository.findByAgent_IdOrderByCreatedAtDesc(agentId, pageable)
+                    : syncLogRepository.findAllByOrderByCreatedAtDesc(pageable);
             case ADMIN_PRINCIPAL, ADMIN_SECONDAIRE -> {
                 if (managed.getOrganization() == null) {
                     throw new BusinessRuleException("Utilisateur sans organisation");
                 }
-                page = syncLogRepository.findByAgent_OrganizationIdOrderByCreatedAtDesc(
-                        managed.getOrganization().getId(), pageable);
+                Long orgId = managed.getOrganization().getId();
+                page = (agentId != null)
+                        ? syncLogRepository.findByAgent_OrganizationIdAndAgent_IdOrderByCreatedAtDesc(
+                                orgId, agentId, pageable)
+                        : syncLogRepository.findByAgent_OrganizationIdOrderByCreatedAtDesc(orgId, pageable);
             }
             case SUPERVISOR -> {
                 List<User> agents = supervisorAgentRepository.findBySupervisorId(managed.getId()).stream()
                         .map(SupervisorAgent::getAgent)
                         .toList();
-                page = syncLogRepository.findByAgentInOrderByCreatedAtDesc(agents, pageable);
+                if (agentId != null) {
+                    // Sécurité : l'agentId demandé doit appartenir à l'équipe du superviseur,
+                    // sinon il pourrait consulter les logs d'un agent hors périmètre.
+                    boolean supervised = agents.stream().anyMatch(a -> a.getId().equals(agentId));
+                    if (!supervised) {
+                        throw new ForbiddenOperationException("Cet agent n'est pas dans votre équipe");
+                    }
+                    page = syncLogRepository.findByAgent_IdOrderByCreatedAtDesc(agentId, pageable);
+                } else {
+                    page = syncLogRepository.findByAgentInOrderByCreatedAtDesc(agents, pageable);
+                }
             }
             default -> throw new ForbiddenOperationException(
                     "Accès refusé aux journaux de synchronisation");
-        }
-
-        // Filtre agentId optionnel : appliqué après la page pour ne pas rompre la pagination.
-        // Acceptable car agentId est un filtre secondaire rare et le résultat est déjà borné.
-        if (agentId != null) {
-            List<SyncLogResponse> filtered = page.stream()
-                    .filter(log -> log.getAgent().getId().equals(agentId))
-                    .map(this::toResponse)
-                    .toList();
-            return new org.springframework.data.domain.PageImpl<>(filtered, pageable, filtered.size());
         }
 
         return page.map(this::toResponse);

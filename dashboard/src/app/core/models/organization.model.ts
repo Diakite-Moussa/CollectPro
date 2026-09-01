@@ -4,6 +4,7 @@ export interface OrganizationResponse {
   description?: string;
   status: 'ACTIVE' | 'INACTIVE'; // ⚠️ corrigé : 'SUSPENDED' n'existe pas côté backend
   createdAt: string;
+  logoUrl?: string;
   principalAdmin?: {
     id: number;
     firstName: string;

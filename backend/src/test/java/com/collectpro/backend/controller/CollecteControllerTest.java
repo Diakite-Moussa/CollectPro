@@ -55,6 +55,9 @@ class CollecteControllerTest {
     private CollecteService collecteService;
 
     @MockitoBean
+    private com.collectpro.backend.service.CollecteExportService exportService;
+
+    @MockitoBean
     private JwtService jwtService;
 
     @MockitoBean

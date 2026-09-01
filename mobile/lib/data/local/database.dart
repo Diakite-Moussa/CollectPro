@@ -12,7 +12,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.executor(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -27,6 +27,17 @@ class AppDatabase extends _$AppDatabase {
           if (from < 3) {
             // v2 -> v3 : ajout des détails d'erreur de synchro (Sprint 5)
             await m.addColumn(collectesTable, collectesTable.syncErrorMessage);
+          }
+          if (from < 4) {
+            // v3 -> v4 : statut de validation renvoyé par le superviseur
+            await m.addColumn(collectesTable, collectesTable.serverStatus);
+            await m.addColumn(collectesTable, collectesTable.validationComment);
+            await m.addColumn(collectesTable, collectesTable.validatedByName);
+            await m.addColumn(collectesTable, collectesTable.validatedAt);
+          }
+          if (from < 5) {
+            // v4 -> v5 : rattachement optionnel à une mission (Sprint 2 V1.1)
+            await m.addColumn(collectesTable, collectesTable.missionId);
           }
         },
       );

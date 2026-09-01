@@ -71,9 +71,11 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/login", "/refresh", "/forgot-password", "/reset-password").permitAll()
                         .requestMatchers(HttpMethod.GET, "/activate").permitAll()
                         .requestMatchers(HttpMethod.POST, "/activate").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/files/organizations/*/logo").permitAll()
                         .requestMatchers(HttpMethod.POST, "/organizations").hasRole("SUPER_ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/organizations/**").hasRole("SUPER_ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/organizations/**").hasRole("SUPER_ADMIN")

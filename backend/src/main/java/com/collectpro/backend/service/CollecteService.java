@@ -4,6 +4,7 @@ import com.collectpro.backend.dto.CollecteAttachmentResponse;
 import com.collectpro.backend.dto.CollecteResponse;
 import com.collectpro.backend.dto.CreateCollecteRequest;
 import com.collectpro.backend.dto.RejectCollecteRequest;
+import com.collectpro.backend.dto.ResubmitCollecteRequest;
 import com.collectpro.backend.dto.ValidateCollecteRequest;
 import com.collectpro.backend.entity.Collecte;
 import com.collectpro.backend.entity.CollecteAttachment;
@@ -30,6 +31,11 @@ import com.collectpro.backend.entity.Validation;
 import com.collectpro.backend.enums.AuditAction;
 import com.collectpro.backend.enums.ValidationDecision;
 import com.collectpro.backend.repository.ValidationRepository;
+import com.collectpro.backend.entity.Mission;
+import com.collectpro.backend.enums.MissionStatus;
+import com.collectpro.backend.repository.MissionRepository;
+import com.collectpro.backend.util.GeoUtils;
+
 
 import java.nio.file.Path;
 import java.util.List;
@@ -47,6 +53,7 @@ public class CollecteService {
     private final FileStorageService fileStorageService;
     private final ValidationRepository validationRepository;
     private final AuditLogService auditLogService;
+    private final MissionRepository missionRepository;
 
     @Transactional
     public CollecteResponse createCollecte(CreateCollecteRequest request, User agent) {
@@ -62,6 +69,8 @@ public class CollecteService {
                     "Ce formulaire n'appartient pas à l'organisation de l'agent");
         }
 
+        Mission mission = resolveMission(request.getMissionId(), agent);
+
         Collecte collecte = Collecte.builder()
                 .agent(agent)
                 .formVersion(formVersion)
@@ -69,6 +78,7 @@ public class CollecteService {
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
                 .status(CollecteStatus.PENDING_VALIDATION)
+                .mission(mission)
                 .build();
         collecte = collecteRepository.save(collecte);
 
@@ -80,6 +90,25 @@ public class CollecteService {
         attachmentService.storeUploadedFiles(collecte, files);
 
         return toResponse(collecte);
+    }
+
+    private Mission resolveMission(Long missionId, User agent) {
+        if (missionId == null) {
+            return null;
+        }
+        Mission mission = missionRepository.findById(missionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Mission introuvable (id=" + missionId + ")"));
+
+        if (!mission.getOrganization().getId().equals(agent.getOrganization().getId())) {
+            throw new ForbiddenOperationException(
+                    "Cette mission n'appartient pas à votre organisation");
+        }
+        if (mission.getStatus() != MissionStatus.ACTIVE) {
+            throw new BusinessRuleException(
+                    "Impossible de rattacher une collecte à une mission qui n'est pas active (statut actuel : "
+                            + mission.getStatus() + ")");
+        }
+        return mission;
     }
 
     @Transactional(readOnly = true)
@@ -106,11 +135,14 @@ public class CollecteService {
                 .toList();
     }
 
-    public List<CollecteResponse> getCollectesForSupervisor(User supervisor) {
+    public List<CollecteResponse> getCollectesForSupervisor(User supervisor, Long missionId) {
         List<User> agents = supervisorAgentRepository.findBySupervisorId(supervisor.getId()).stream()
                 .map(SupervisorAgent::getAgent)
                 .toList();
-        return collecteRepository.findByAgentIn(agents).stream()
+        List<Collecte> collectes = (missionId != null)
+                ? collecteRepository.findByAgentInAndMissionId(agents, missionId)
+                : collecteRepository.findByAgentIn(agents);
+        return collectes.stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -124,22 +156,25 @@ public class CollecteService {
                 .toList();
     }
 
-    public List<CollecteResponse> getCollectesForAdmin(User admin) {
+    public List<CollecteResponse> getCollectesForAdmin(User admin, Long missionId) {
         User managedAdmin = userRepository.findById(admin.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
         List<Collecte> collectes;
         if (managedAdmin.getRole().getName() == RoleType.SUPER_ADMIN) {
-            collectes = collecteRepository.findAll();
+            collectes = (missionId != null)
+                    ? collecteRepository.findByMissionId(missionId)
+                    : collecteRepository.findAll();
         } else {
             if (managedAdmin.getOrganization() == null) {
                 throw new BusinessRuleException("Utilisateur sans organisation");
             }
-            collectes = collecteRepository.findByAgent_OrganizationId(managedAdmin.getOrganization().getId());
+            collectes = (missionId != null)
+                    ? collecteRepository.findByAgent_OrganizationIdAndMissionId(managedAdmin.getOrganization().getId(), missionId)
+                    : collecteRepository.findByAgent_OrganizationId(managedAdmin.getOrganization().getId());
         }
         return collectes.stream().map(this::toResponse).toList();
     }
-
     @Transactional
     public CollecteResponse validateCollecte(Long collecteId, User supervisor, ValidateCollecteRequest request) {
         Collecte collecte = getCollecteAndCheckSupervision(collecteId, supervisor);
@@ -183,6 +218,42 @@ public class CollecteService {
                 "Collecte",
                 collecte.getId(),
                 "Collecte #" + collecte.getId() + " rejetée (agent " + collecte.getAgent().getEmail() + ") : " + request.getComment()
+        );
+
+        return toResponse(collecte);
+    }
+
+    @Transactional
+    public CollecteResponse resubmitCollecte(Long collecteId, User agent, ResubmitCollecteRequest request) {
+        Collecte collecte = collecteRepository.findById(collecteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Collecte introuvable"));
+
+        if (!collecte.getAgent().getId().equals(agent.getId())) {
+            throw new ForbiddenOperationException("Vous n'êtes pas l'auteur de cette collecte");
+        }
+
+        if (collecte.getStatus() != CollecteStatus.REJECTED) {
+            throw new BusinessRuleException(
+                    "Seule une collecte rejetée peut être renvoyée (statut actuel : " + collecte.getStatus() + ")");
+        }
+
+        collecte.setDataJson(request.getDataJson());
+        collecte.setLatitude(request.getLatitude());
+        collecte.setLongitude(request.getLongitude());
+        collecte.setStatus(CollecteStatus.PENDING_VALIDATION);
+        // On efface la décision précédente : la collecte redevient "vierge" de validation.
+        collecte.setValidationComment(null);
+        collecte.setValidatedBy(null);
+        collecte.setValidatedAt(null);
+        collecte = collecteRepository.save(collecte);
+
+        auditLogService.log(
+                agent,
+                agent.getOrganization(),
+                AuditAction.COLLECTE_RESUBMITTED,
+                "Collecte",
+                collecte.getId(),
+                "Collecte #" + collecte.getId() + " renvoyée après rejet par l'agent " + agent.getEmail()
         );
 
         return toResponse(collecte);
@@ -266,6 +337,23 @@ public class CollecteService {
         throw new ForbiddenOperationException("Accès refusé à cette pièce jointe");
     }
 
+    private Boolean computeOutsideMissionZone(Collecte collecte) {
+        Mission mission = collecte.getMission();
+        if (mission == null
+                || mission.getLatitude() == null
+                || mission.getLongitude() == null
+                || mission.getRadiusMeters() == null
+                || collecte.getLatitude() == null
+                || collecte.getLongitude() == null) {
+            return null;
+        }
+        double distance = GeoUtils.distanceInMeters(
+                mission.getLatitude(), mission.getLongitude(),
+                collecte.getLatitude(), collecte.getLongitude()
+        );
+        return distance > mission.getRadiusMeters();
+    }
+
     private CollecteResponse toResponse(Collecte collecte) {
         List<CollecteAttachmentResponse> attachments =
                 attachmentService.getAttachmentsForCollecte(collecte.getId());
@@ -294,6 +382,8 @@ public class CollecteService {
                 .validatedAt(collecte.getValidatedAt())
                 .createdAt(collecte.getCreatedAt())
                 .updatedAt(collecte.getUpdatedAt())
+                .missionId(collecte.getMission() != null ? collecte.getMission().getId() : null)
+                .outsideMissionZone(computeOutsideMissionZone(collecte))
                 .build();
     }
 }

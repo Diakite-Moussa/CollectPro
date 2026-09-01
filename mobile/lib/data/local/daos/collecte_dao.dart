@@ -18,6 +18,7 @@ class CollecteDao extends DatabaseAccessor<AppDatabase> with _$CollecteDaoMixin 
     required int formVersionId,
     required String dataJson,
     int? agentId,
+    int? missionId,  // AJOUTÉ : identifiant de la mission
     double? latitude,
     double? longitude,
     List<String>? photoPaths,
@@ -29,11 +30,11 @@ class CollecteDao extends DatabaseAccessor<AppDatabase> with _$CollecteDaoMixin 
         formVersionId: formVersionId,
         dataJson: dataJson,
         agentId: Value(agentId),
+        missionId: Value(missionId),  // AJOUTÉ : liaison avec la mission
         latitude: Value(latitude),
         longitude: Value(longitude),
         photoPaths: Value(photoPaths == null ? null : _encodeList(photoPaths)),
-        documentPaths:
-            Value(documentPaths == null ? null : _encodeList(documentPaths)),
+        documentPaths: Value(documentPaths == null ? null : _encodeList(documentPaths)),
         localStatus: Value(readyForSync ? 'PENDING_SYNC' : 'DRAFT'),
       ),
     );
@@ -76,21 +77,21 @@ class CollecteDao extends DatabaseAccessor<AppDatabase> with _$CollecteDaoMixin 
   /// Toutes les collectes locales (pour un écran "mes collectes").
   Future<List<CollecteRow>> getAllCollectes() {
     return (select(collectesTable)
-          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
         .get();
   }
 
   /// Stream réactif : l'UI se met à jour automatiquement à chaque changement.
   Stream<List<CollecteRow>> watchAllCollectes() {
     return (select(collectesTable)
-          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
         .watch();
   }
 
   /// Les collectes en attente de synchronisation (utile dès le Sprint 5).
   Future<List<CollecteRow>> getPendingSync() {
     return (select(collectesTable)
-          ..where((t) => t.localStatus.equals('PENDING_SYNC')))
+      ..where((t) => t.localStatus.equals('PENDING_SYNC')))
         .get();
   }
 
@@ -151,6 +152,54 @@ class CollecteDao extends DatabaseAccessor<AppDatabase> with _$CollecteDaoMixin 
     );
   }
 
+  /// Met à jour le statut de validation renvoyé par le serveur, en retrouvant
+  /// la ligne locale via son serverId.
+  Future<void> updateValidationStatus({
+    required int serverId,
+    required String serverStatus,
+    String? validationComment,
+    String? validatedByName,
+    DateTime? validatedAt,
+  }) {
+    return (update(collectesTable)..where((t) => t.serverId.equals(serverId))).write(
+      CollectesTableCompanion(
+        serverStatus: Value(serverStatus),
+        validationComment: Value(validationComment),
+        validatedByName: Value(validatedByName),
+        validatedAt: Value(validatedAt),
+      ),
+    );
+  }
+
+  /// Récupère une collecte locale par son serverId (pour pré-remplir l'écran
+  /// de correction après un rejet).
+  Future<CollecteRow?> getByServerId(int serverId) {
+    return (select(collectesTable)..where((t) => t.serverId.equals(serverId)))
+        .getSingleOrNull();
+  }
+
+  /// Récupère une collecte locale par son identifiant local id.
+  Future<CollecteRow?> getById(int localId) {
+    return (select(collectesTable)..where((t) => t.id.equals(localId)))
+        .getSingleOrNull();
+  }
+
+  /// Récupère toutes les collectes d'une mission spécifique.
+  Future<List<CollecteRow>> getCollectesByMission(int missionId) {
+    return (select(collectesTable)
+      ..where((t) => t.missionId.equals(missionId))
+      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+        .get();
+  }
+
+  /// Stream réactif des collectes d'une mission spécifique.
+  Stream<List<CollecteRow>> watchCollectesByMission(int missionId) {
+    return (select(collectesTable)
+      ..where((t) => t.missionId.equals(missionId))
+      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+        .watch();
+  }
+
   /// Supprime une collecte locale spécifique par son ID.
   Future<int> deleteCollecte(int localId) {
     return (delete(collectesTable)..where((t) => t.id.equals(localId))).go();
@@ -159,6 +208,20 @@ class CollecteDao extends DatabaseAccessor<AppDatabase> with _$CollecteDaoMixin 
   /// Efface toutes les collectes locales de la base SQLite de l'appareil.
   Future<int> clearAllCollectes() {
     return delete(collectesTable).go();
+  }
+
+  /// Supprime toutes les collectes d'une mission spécifique.
+  Future<int> deleteCollectesByMission(int missionId) {
+    return (delete(collectesTable)..where((t) => t.missionId.equals(missionId))).go();
+  }
+
+  /// Compte le nombre de collectes pour une mission donnée (COUNT SQL,
+  /// sans charger les lignes en mémoire).
+  Future<int> countCollectesByMission(int missionId) {
+    final query = selectOnly(collectesTable)
+      ..where(collectesTable.missionId.equals(missionId))
+      ..addColumns([collectesTable.id.count()]);
+    return query.map((row) => row.read(collectesTable.id.count()) ?? 0).getSingle();
   }
 
   String _encodeList(List<String> items) => jsonEncode(items);

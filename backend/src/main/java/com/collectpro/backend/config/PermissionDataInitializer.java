@@ -29,7 +29,8 @@ public class PermissionDataInitializer implements CommandLineRunner {
             "CREATE_ORGANIZATION", "CREATE_USER", "UPDATE_USER", "DISABLE_USER",
             "CREATE_FORM", "UPDATE_FORM", "PUBLISH_FORM",
             "CREATE_COLLECTE", "VIEW_COLLECTE", "VALIDATE_COLLECTE", "REJECT_COLLECTE",
-            "GENERATE_REPORT", "VIEW_STATISTICS"
+            "GENERATE_REPORT", "VIEW_REPORT", "VIEW_STATISTICS",
+            "CREATE_MISSION", "UPDATE_MISSION", "ASSIGN_MISSION", "VIEW_MISSION", "CANCEL_MISSION"
     );
 
     private static final Map<RoleType, List<String>> DEFAULT_ROLE_PERMISSIONS = new EnumMap<>(RoleType.class);
@@ -38,12 +39,15 @@ public class PermissionDataInitializer implements CommandLineRunner {
         DEFAULT_ROLE_PERMISSIONS.put(RoleType.ADMIN_PRINCIPAL, List.of(
                 "CREATE_USER", "UPDATE_USER", "DISABLE_USER",
                 "CREATE_FORM", "UPDATE_FORM", "PUBLISH_FORM",
-                "VIEW_COLLECTE", "GENERATE_REPORT", "VIEW_STATISTICS"));
+                "VIEW_COLLECTE", "GENERATE_REPORT", "VIEW_REPORT", "VIEW_STATISTICS",
+                "CREATE_MISSION", "UPDATE_MISSION", "ASSIGN_MISSION", "VIEW_MISSION", "CANCEL_MISSION"));
         DEFAULT_ROLE_PERMISSIONS.put(RoleType.ADMIN_SECONDAIRE, List.of());
         DEFAULT_ROLE_PERMISSIONS.put(RoleType.SUPERVISOR, List.of(
-                "VIEW_COLLECTE", "VALIDATE_COLLECTE", "REJECT_COLLECTE", "VIEW_STATISTICS"));
-        DEFAULT_ROLE_PERMISSIONS.put(RoleType.AGENT, List.of("CREATE_COLLECTE", "VIEW_COLLECTE"));
+                "VIEW_COLLECTE", "VALIDATE_COLLECTE", "REJECT_COLLECTE", "VIEW_STATISTICS",
+                "VIEW_MISSION", "ASSIGN_MISSION", "VIEW_REPORT"));
+        DEFAULT_ROLE_PERMISSIONS.put(RoleType.AGENT, List.of("CREATE_COLLECTE", "VIEW_COLLECTE", "VIEW_MISSION"));
     }
+
 
     @Override
     @Transactional

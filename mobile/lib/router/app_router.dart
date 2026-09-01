@@ -5,11 +5,13 @@ import '../providers/auth_provider.dart';
 import '../screens/activation_screen.dart';
 import '../screens/collecte_detail_screen.dart';
 import '../screens/collecte_form_screen.dart';
+import '../screens/edit_rejected_collecte_screen.dart';
 import '../screens/form_list_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/main_navigation_screen.dart';
 import '../screens/reset_password_screen.dart';
 import '../screens/splash_screen.dart';
+import '../screens/mission_list_screen.dart';
 
 /// Notifie GoRouter quand l'état d'auth change, SANS recréer le router
 /// (contrairement à un Provider qui ferait un ref.watch direct).
@@ -65,6 +67,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/home', builder: (context, state) => const MainNavigationScreen()),
       GoRoute(path: '/forms', builder: (context, state) => const FormListScreen()),
       GoRoute(
+        path: '/forms/edit-rejected/:id',
+        builder: (context, state) {
+          final idStr = state.pathParameters['id'] ?? '0';
+          final id = int.tryParse(idStr) ?? 0;
+          return EditRejectedCollecteScreen(localId: id);
+        },
+      ),
+      GoRoute(
         path: '/collecte-detail/:id',
         builder: (context, state) {
           final idStr = state.pathParameters['id'] ?? '0';
@@ -85,6 +95,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
+
+      GoRoute(path: '/missions', builder: (context, state) => const MissionListScreen()),
     ],
   );
 });

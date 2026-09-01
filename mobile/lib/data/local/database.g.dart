@@ -44,6 +44,17 @@ class $CollectesTableTable extends CollectesTable
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _missionIdMeta = const VerificationMeta(
+    'missionId',
+  );
+  @override
+  late final GeneratedColumn<int> missionId = GeneratedColumn<int>(
+    'mission_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _agentIdMeta = const VerificationMeta(
     'agentId',
   );
@@ -122,6 +133,51 @@ class $CollectesTableTable extends CollectesTable
     requiredDuringInsert: false,
     defaultValue: const Constant('DRAFT'),
   );
+  static const VerificationMeta _serverStatusMeta = const VerificationMeta(
+    'serverStatus',
+  );
+  @override
+  late final GeneratedColumn<String> serverStatus = GeneratedColumn<String>(
+    'server_status',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _validationCommentMeta = const VerificationMeta(
+    'validationComment',
+  );
+  @override
+  late final GeneratedColumn<String> validationComment =
+      GeneratedColumn<String>(
+        'validation_comment',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _validatedByNameMeta = const VerificationMeta(
+    'validatedByName',
+  );
+  @override
+  late final GeneratedColumn<String> validatedByName = GeneratedColumn<String>(
+    'validated_by_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _validatedAtMeta = const VerificationMeta(
+    'validatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> validatedAt = GeneratedColumn<DateTime>(
+    'validated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _syncErrorMessageMeta = const VerificationMeta(
     'syncErrorMessage',
   );
@@ -162,6 +218,7 @@ class $CollectesTableTable extends CollectesTable
     id,
     serverId,
     formVersionId,
+    missionId,
     agentId,
     dataJson,
     latitude,
@@ -169,6 +226,10 @@ class $CollectesTableTable extends CollectesTable
     photoPaths,
     documentPaths,
     localStatus,
+    serverStatus,
+    validationComment,
+    validatedByName,
+    validatedAt,
     syncErrorMessage,
     createdAt,
     updatedAt,
@@ -204,6 +265,12 @@ class $CollectesTableTable extends CollectesTable
       );
     } else if (isInserting) {
       context.missing(_formVersionIdMeta);
+    }
+    if (data.containsKey('mission_id')) {
+      context.handle(
+        _missionIdMeta,
+        missionId.isAcceptableOrUnknown(data['mission_id']!, _missionIdMeta),
+      );
     }
     if (data.containsKey('agent_id')) {
       context.handle(
@@ -255,6 +322,42 @@ class $CollectesTableTable extends CollectesTable
         ),
       );
     }
+    if (data.containsKey('server_status')) {
+      context.handle(
+        _serverStatusMeta,
+        serverStatus.isAcceptableOrUnknown(
+          data['server_status']!,
+          _serverStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('validation_comment')) {
+      context.handle(
+        _validationCommentMeta,
+        validationComment.isAcceptableOrUnknown(
+          data['validation_comment']!,
+          _validationCommentMeta,
+        ),
+      );
+    }
+    if (data.containsKey('validated_by_name')) {
+      context.handle(
+        _validatedByNameMeta,
+        validatedByName.isAcceptableOrUnknown(
+          data['validated_by_name']!,
+          _validatedByNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('validated_at')) {
+      context.handle(
+        _validatedAtMeta,
+        validatedAt.isAcceptableOrUnknown(
+          data['validated_at']!,
+          _validatedAtMeta,
+        ),
+      );
+    }
     if (data.containsKey('sync_error_message')) {
       context.handle(
         _syncErrorMessageMeta,
@@ -297,6 +400,10 @@ class $CollectesTableTable extends CollectesTable
         DriftSqlType.int,
         data['${effectivePrefix}form_version_id'],
       )!,
+      missionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}mission_id'],
+      ),
       agentId: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}agent_id'],
@@ -325,6 +432,22 @@ class $CollectesTableTable extends CollectesTable
         DriftSqlType.string,
         data['${effectivePrefix}local_status'],
       )!,
+      serverStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}server_status'],
+      ),
+      validationComment: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}validation_comment'],
+      ),
+      validatedByName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}validated_by_name'],
+      ),
+      validatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}validated_at'],
+      ),
       syncErrorMessage: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}sync_error_message'],
@@ -351,6 +474,9 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
   final int? serverId;
   final int formVersionId;
 
+  /// Mission active à laquelle rattacher cette collecte (optionnel).
+  final int? missionId;
+
   /// Agent qui a saisi la collecte (User.id côté backend).
   /// Nullable pour compatibilité avec les lignes créées avant cette colonne.
   final int? agentId;
@@ -365,6 +491,13 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
   /// Chemins locaux des documents joints, encodés en JSON (liste de String).
   final String? documentPaths;
   final String localStatus;
+
+  /// Statut métier renvoyé par le serveur (PENDING_VALIDATION, VALIDATED,
+  /// REJECTED...). Distinct de localStatus qui ne concerne que la synchro.
+  final String? serverStatus;
+  final String? validationComment;
+  final String? validatedByName;
+  final DateTime? validatedAt;
   final String? syncErrorMessage;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -372,6 +505,7 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
     required this.id,
     this.serverId,
     required this.formVersionId,
+    this.missionId,
     this.agentId,
     required this.dataJson,
     this.latitude,
@@ -379,6 +513,10 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
     this.photoPaths,
     this.documentPaths,
     required this.localStatus,
+    this.serverStatus,
+    this.validationComment,
+    this.validatedByName,
+    this.validatedAt,
     this.syncErrorMessage,
     required this.createdAt,
     required this.updatedAt,
@@ -391,6 +529,9 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
       map['server_id'] = Variable<int>(serverId);
     }
     map['form_version_id'] = Variable<int>(formVersionId);
+    if (!nullToAbsent || missionId != null) {
+      map['mission_id'] = Variable<int>(missionId);
+    }
     if (!nullToAbsent || agentId != null) {
       map['agent_id'] = Variable<int>(agentId);
     }
@@ -408,6 +549,18 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
       map['document_paths'] = Variable<String>(documentPaths);
     }
     map['local_status'] = Variable<String>(localStatus);
+    if (!nullToAbsent || serverStatus != null) {
+      map['server_status'] = Variable<String>(serverStatus);
+    }
+    if (!nullToAbsent || validationComment != null) {
+      map['validation_comment'] = Variable<String>(validationComment);
+    }
+    if (!nullToAbsent || validatedByName != null) {
+      map['validated_by_name'] = Variable<String>(validatedByName);
+    }
+    if (!nullToAbsent || validatedAt != null) {
+      map['validated_at'] = Variable<DateTime>(validatedAt);
+    }
     if (!nullToAbsent || syncErrorMessage != null) {
       map['sync_error_message'] = Variable<String>(syncErrorMessage);
     }
@@ -423,6 +576,9 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
           ? const Value.absent()
           : Value(serverId),
       formVersionId: Value(formVersionId),
+      missionId: missionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(missionId),
       agentId: agentId == null && nullToAbsent
           ? const Value.absent()
           : Value(agentId),
@@ -440,6 +596,18 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
           ? const Value.absent()
           : Value(documentPaths),
       localStatus: Value(localStatus),
+      serverStatus: serverStatus == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverStatus),
+      validationComment: validationComment == null && nullToAbsent
+          ? const Value.absent()
+          : Value(validationComment),
+      validatedByName: validatedByName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(validatedByName),
+      validatedAt: validatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(validatedAt),
       syncErrorMessage: syncErrorMessage == null && nullToAbsent
           ? const Value.absent()
           : Value(syncErrorMessage),
@@ -457,6 +625,7 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
       id: serializer.fromJson<int>(json['id']),
       serverId: serializer.fromJson<int?>(json['serverId']),
       formVersionId: serializer.fromJson<int>(json['formVersionId']),
+      missionId: serializer.fromJson<int?>(json['missionId']),
       agentId: serializer.fromJson<int?>(json['agentId']),
       dataJson: serializer.fromJson<String>(json['dataJson']),
       latitude: serializer.fromJson<double?>(json['latitude']),
@@ -464,6 +633,12 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
       photoPaths: serializer.fromJson<String?>(json['photoPaths']),
       documentPaths: serializer.fromJson<String?>(json['documentPaths']),
       localStatus: serializer.fromJson<String>(json['localStatus']),
+      serverStatus: serializer.fromJson<String?>(json['serverStatus']),
+      validationComment: serializer.fromJson<String?>(
+        json['validationComment'],
+      ),
+      validatedByName: serializer.fromJson<String?>(json['validatedByName']),
+      validatedAt: serializer.fromJson<DateTime?>(json['validatedAt']),
       syncErrorMessage: serializer.fromJson<String?>(json['syncErrorMessage']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -476,6 +651,7 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
       'id': serializer.toJson<int>(id),
       'serverId': serializer.toJson<int?>(serverId),
       'formVersionId': serializer.toJson<int>(formVersionId),
+      'missionId': serializer.toJson<int?>(missionId),
       'agentId': serializer.toJson<int?>(agentId),
       'dataJson': serializer.toJson<String>(dataJson),
       'latitude': serializer.toJson<double?>(latitude),
@@ -483,6 +659,10 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
       'photoPaths': serializer.toJson<String?>(photoPaths),
       'documentPaths': serializer.toJson<String?>(documentPaths),
       'localStatus': serializer.toJson<String>(localStatus),
+      'serverStatus': serializer.toJson<String?>(serverStatus),
+      'validationComment': serializer.toJson<String?>(validationComment),
+      'validatedByName': serializer.toJson<String?>(validatedByName),
+      'validatedAt': serializer.toJson<DateTime?>(validatedAt),
       'syncErrorMessage': serializer.toJson<String?>(syncErrorMessage),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -493,6 +673,7 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
     int? id,
     Value<int?> serverId = const Value.absent(),
     int? formVersionId,
+    Value<int?> missionId = const Value.absent(),
     Value<int?> agentId = const Value.absent(),
     String? dataJson,
     Value<double?> latitude = const Value.absent(),
@@ -500,6 +681,10 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
     Value<String?> photoPaths = const Value.absent(),
     Value<String?> documentPaths = const Value.absent(),
     String? localStatus,
+    Value<String?> serverStatus = const Value.absent(),
+    Value<String?> validationComment = const Value.absent(),
+    Value<String?> validatedByName = const Value.absent(),
+    Value<DateTime?> validatedAt = const Value.absent(),
     Value<String?> syncErrorMessage = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -507,6 +692,7 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
     id: id ?? this.id,
     serverId: serverId.present ? serverId.value : this.serverId,
     formVersionId: formVersionId ?? this.formVersionId,
+    missionId: missionId.present ? missionId.value : this.missionId,
     agentId: agentId.present ? agentId.value : this.agentId,
     dataJson: dataJson ?? this.dataJson,
     latitude: latitude.present ? latitude.value : this.latitude,
@@ -516,6 +702,14 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
         ? documentPaths.value
         : this.documentPaths,
     localStatus: localStatus ?? this.localStatus,
+    serverStatus: serverStatus.present ? serverStatus.value : this.serverStatus,
+    validationComment: validationComment.present
+        ? validationComment.value
+        : this.validationComment,
+    validatedByName: validatedByName.present
+        ? validatedByName.value
+        : this.validatedByName,
+    validatedAt: validatedAt.present ? validatedAt.value : this.validatedAt,
     syncErrorMessage: syncErrorMessage.present
         ? syncErrorMessage.value
         : this.syncErrorMessage,
@@ -529,6 +723,7 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
       formVersionId: data.formVersionId.present
           ? data.formVersionId.value
           : this.formVersionId,
+      missionId: data.missionId.present ? data.missionId.value : this.missionId,
       agentId: data.agentId.present ? data.agentId.value : this.agentId,
       dataJson: data.dataJson.present ? data.dataJson.value : this.dataJson,
       latitude: data.latitude.present ? data.latitude.value : this.latitude,
@@ -542,6 +737,18 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
       localStatus: data.localStatus.present
           ? data.localStatus.value
           : this.localStatus,
+      serverStatus: data.serverStatus.present
+          ? data.serverStatus.value
+          : this.serverStatus,
+      validationComment: data.validationComment.present
+          ? data.validationComment.value
+          : this.validationComment,
+      validatedByName: data.validatedByName.present
+          ? data.validatedByName.value
+          : this.validatedByName,
+      validatedAt: data.validatedAt.present
+          ? data.validatedAt.value
+          : this.validatedAt,
       syncErrorMessage: data.syncErrorMessage.present
           ? data.syncErrorMessage.value
           : this.syncErrorMessage,
@@ -556,6 +763,7 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
           ..write('id: $id, ')
           ..write('serverId: $serverId, ')
           ..write('formVersionId: $formVersionId, ')
+          ..write('missionId: $missionId, ')
           ..write('agentId: $agentId, ')
           ..write('dataJson: $dataJson, ')
           ..write('latitude: $latitude, ')
@@ -563,6 +771,10 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
           ..write('photoPaths: $photoPaths, ')
           ..write('documentPaths: $documentPaths, ')
           ..write('localStatus: $localStatus, ')
+          ..write('serverStatus: $serverStatus, ')
+          ..write('validationComment: $validationComment, ')
+          ..write('validatedByName: $validatedByName, ')
+          ..write('validatedAt: $validatedAt, ')
           ..write('syncErrorMessage: $syncErrorMessage, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -575,6 +787,7 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
     id,
     serverId,
     formVersionId,
+    missionId,
     agentId,
     dataJson,
     latitude,
@@ -582,6 +795,10 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
     photoPaths,
     documentPaths,
     localStatus,
+    serverStatus,
+    validationComment,
+    validatedByName,
+    validatedAt,
     syncErrorMessage,
     createdAt,
     updatedAt,
@@ -593,6 +810,7 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
           other.id == this.id &&
           other.serverId == this.serverId &&
           other.formVersionId == this.formVersionId &&
+          other.missionId == this.missionId &&
           other.agentId == this.agentId &&
           other.dataJson == this.dataJson &&
           other.latitude == this.latitude &&
@@ -600,6 +818,10 @@ class CollecteRow extends DataClass implements Insertable<CollecteRow> {
           other.photoPaths == this.photoPaths &&
           other.documentPaths == this.documentPaths &&
           other.localStatus == this.localStatus &&
+          other.serverStatus == this.serverStatus &&
+          other.validationComment == this.validationComment &&
+          other.validatedByName == this.validatedByName &&
+          other.validatedAt == this.validatedAt &&
           other.syncErrorMessage == this.syncErrorMessage &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -609,6 +831,7 @@ class CollectesTableCompanion extends UpdateCompanion<CollecteRow> {
   final Value<int> id;
   final Value<int?> serverId;
   final Value<int> formVersionId;
+  final Value<int?> missionId;
   final Value<int?> agentId;
   final Value<String> dataJson;
   final Value<double?> latitude;
@@ -616,6 +839,10 @@ class CollectesTableCompanion extends UpdateCompanion<CollecteRow> {
   final Value<String?> photoPaths;
   final Value<String?> documentPaths;
   final Value<String> localStatus;
+  final Value<String?> serverStatus;
+  final Value<String?> validationComment;
+  final Value<String?> validatedByName;
+  final Value<DateTime?> validatedAt;
   final Value<String?> syncErrorMessage;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -623,6 +850,7 @@ class CollectesTableCompanion extends UpdateCompanion<CollecteRow> {
     this.id = const Value.absent(),
     this.serverId = const Value.absent(),
     this.formVersionId = const Value.absent(),
+    this.missionId = const Value.absent(),
     this.agentId = const Value.absent(),
     this.dataJson = const Value.absent(),
     this.latitude = const Value.absent(),
@@ -630,6 +858,10 @@ class CollectesTableCompanion extends UpdateCompanion<CollecteRow> {
     this.photoPaths = const Value.absent(),
     this.documentPaths = const Value.absent(),
     this.localStatus = const Value.absent(),
+    this.serverStatus = const Value.absent(),
+    this.validationComment = const Value.absent(),
+    this.validatedByName = const Value.absent(),
+    this.validatedAt = const Value.absent(),
     this.syncErrorMessage = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -638,6 +870,7 @@ class CollectesTableCompanion extends UpdateCompanion<CollecteRow> {
     this.id = const Value.absent(),
     this.serverId = const Value.absent(),
     required int formVersionId,
+    this.missionId = const Value.absent(),
     this.agentId = const Value.absent(),
     required String dataJson,
     this.latitude = const Value.absent(),
@@ -645,6 +878,10 @@ class CollectesTableCompanion extends UpdateCompanion<CollecteRow> {
     this.photoPaths = const Value.absent(),
     this.documentPaths = const Value.absent(),
     this.localStatus = const Value.absent(),
+    this.serverStatus = const Value.absent(),
+    this.validationComment = const Value.absent(),
+    this.validatedByName = const Value.absent(),
+    this.validatedAt = const Value.absent(),
     this.syncErrorMessage = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -654,6 +891,7 @@ class CollectesTableCompanion extends UpdateCompanion<CollecteRow> {
     Expression<int>? id,
     Expression<int>? serverId,
     Expression<int>? formVersionId,
+    Expression<int>? missionId,
     Expression<int>? agentId,
     Expression<String>? dataJson,
     Expression<double>? latitude,
@@ -661,6 +899,10 @@ class CollectesTableCompanion extends UpdateCompanion<CollecteRow> {
     Expression<String>? photoPaths,
     Expression<String>? documentPaths,
     Expression<String>? localStatus,
+    Expression<String>? serverStatus,
+    Expression<String>? validationComment,
+    Expression<String>? validatedByName,
+    Expression<DateTime>? validatedAt,
     Expression<String>? syncErrorMessage,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -669,6 +911,7 @@ class CollectesTableCompanion extends UpdateCompanion<CollecteRow> {
       if (id != null) 'id': id,
       if (serverId != null) 'server_id': serverId,
       if (formVersionId != null) 'form_version_id': formVersionId,
+      if (missionId != null) 'mission_id': missionId,
       if (agentId != null) 'agent_id': agentId,
       if (dataJson != null) 'data_json': dataJson,
       if (latitude != null) 'latitude': latitude,
@@ -676,6 +919,10 @@ class CollectesTableCompanion extends UpdateCompanion<CollecteRow> {
       if (photoPaths != null) 'photo_paths': photoPaths,
       if (documentPaths != null) 'document_paths': documentPaths,
       if (localStatus != null) 'local_status': localStatus,
+      if (serverStatus != null) 'server_status': serverStatus,
+      if (validationComment != null) 'validation_comment': validationComment,
+      if (validatedByName != null) 'validated_by_name': validatedByName,
+      if (validatedAt != null) 'validated_at': validatedAt,
       if (syncErrorMessage != null) 'sync_error_message': syncErrorMessage,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -686,6 +933,7 @@ class CollectesTableCompanion extends UpdateCompanion<CollecteRow> {
     Value<int>? id,
     Value<int?>? serverId,
     Value<int>? formVersionId,
+    Value<int?>? missionId,
     Value<int?>? agentId,
     Value<String>? dataJson,
     Value<double?>? latitude,
@@ -693,6 +941,10 @@ class CollectesTableCompanion extends UpdateCompanion<CollecteRow> {
     Value<String?>? photoPaths,
     Value<String?>? documentPaths,
     Value<String>? localStatus,
+    Value<String?>? serverStatus,
+    Value<String?>? validationComment,
+    Value<String?>? validatedByName,
+    Value<DateTime?>? validatedAt,
     Value<String?>? syncErrorMessage,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -701,6 +953,7 @@ class CollectesTableCompanion extends UpdateCompanion<CollecteRow> {
       id: id ?? this.id,
       serverId: serverId ?? this.serverId,
       formVersionId: formVersionId ?? this.formVersionId,
+      missionId: missionId ?? this.missionId,
       agentId: agentId ?? this.agentId,
       dataJson: dataJson ?? this.dataJson,
       latitude: latitude ?? this.latitude,
@@ -708,6 +961,10 @@ class CollectesTableCompanion extends UpdateCompanion<CollecteRow> {
       photoPaths: photoPaths ?? this.photoPaths,
       documentPaths: documentPaths ?? this.documentPaths,
       localStatus: localStatus ?? this.localStatus,
+      serverStatus: serverStatus ?? this.serverStatus,
+      validationComment: validationComment ?? this.validationComment,
+      validatedByName: validatedByName ?? this.validatedByName,
+      validatedAt: validatedAt ?? this.validatedAt,
       syncErrorMessage: syncErrorMessage ?? this.syncErrorMessage,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -725,6 +982,9 @@ class CollectesTableCompanion extends UpdateCompanion<CollecteRow> {
     }
     if (formVersionId.present) {
       map['form_version_id'] = Variable<int>(formVersionId.value);
+    }
+    if (missionId.present) {
+      map['mission_id'] = Variable<int>(missionId.value);
     }
     if (agentId.present) {
       map['agent_id'] = Variable<int>(agentId.value);
@@ -747,6 +1007,18 @@ class CollectesTableCompanion extends UpdateCompanion<CollecteRow> {
     if (localStatus.present) {
       map['local_status'] = Variable<String>(localStatus.value);
     }
+    if (serverStatus.present) {
+      map['server_status'] = Variable<String>(serverStatus.value);
+    }
+    if (validationComment.present) {
+      map['validation_comment'] = Variable<String>(validationComment.value);
+    }
+    if (validatedByName.present) {
+      map['validated_by_name'] = Variable<String>(validatedByName.value);
+    }
+    if (validatedAt.present) {
+      map['validated_at'] = Variable<DateTime>(validatedAt.value);
+    }
     if (syncErrorMessage.present) {
       map['sync_error_message'] = Variable<String>(syncErrorMessage.value);
     }
@@ -765,6 +1037,7 @@ class CollectesTableCompanion extends UpdateCompanion<CollecteRow> {
           ..write('id: $id, ')
           ..write('serverId: $serverId, ')
           ..write('formVersionId: $formVersionId, ')
+          ..write('missionId: $missionId, ')
           ..write('agentId: $agentId, ')
           ..write('dataJson: $dataJson, ')
           ..write('latitude: $latitude, ')
@@ -772,6 +1045,10 @@ class CollectesTableCompanion extends UpdateCompanion<CollecteRow> {
           ..write('photoPaths: $photoPaths, ')
           ..write('documentPaths: $documentPaths, ')
           ..write('localStatus: $localStatus, ')
+          ..write('serverStatus: $serverStatus, ')
+          ..write('validationComment: $validationComment, ')
+          ..write('validatedByName: $validatedByName, ')
+          ..write('validatedAt: $validatedAt, ')
           ..write('syncErrorMessage: $syncErrorMessage, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -797,6 +1074,7 @@ typedef $$CollectesTableTableCreateCompanionBuilder =
       Value<int> id,
       Value<int?> serverId,
       required int formVersionId,
+      Value<int?> missionId,
       Value<int?> agentId,
       required String dataJson,
       Value<double?> latitude,
@@ -804,6 +1082,10 @@ typedef $$CollectesTableTableCreateCompanionBuilder =
       Value<String?> photoPaths,
       Value<String?> documentPaths,
       Value<String> localStatus,
+      Value<String?> serverStatus,
+      Value<String?> validationComment,
+      Value<String?> validatedByName,
+      Value<DateTime?> validatedAt,
       Value<String?> syncErrorMessage,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -813,6 +1095,7 @@ typedef $$CollectesTableTableUpdateCompanionBuilder =
       Value<int> id,
       Value<int?> serverId,
       Value<int> formVersionId,
+      Value<int?> missionId,
       Value<int?> agentId,
       Value<String> dataJson,
       Value<double?> latitude,
@@ -820,6 +1103,10 @@ typedef $$CollectesTableTableUpdateCompanionBuilder =
       Value<String?> photoPaths,
       Value<String?> documentPaths,
       Value<String> localStatus,
+      Value<String?> serverStatus,
+      Value<String?> validationComment,
+      Value<String?> validatedByName,
+      Value<DateTime?> validatedAt,
       Value<String?> syncErrorMessage,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -846,6 +1133,11 @@ class $$CollectesTableTableFilterComposer
 
   ColumnFilters<int> get formVersionId => $composableBuilder(
     column: $table.formVersionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get missionId => $composableBuilder(
+    column: $table.missionId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -881,6 +1173,26 @@ class $$CollectesTableTableFilterComposer
 
   ColumnFilters<String> get localStatus => $composableBuilder(
     column: $table.localStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get serverStatus => $composableBuilder(
+    column: $table.serverStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get validationComment => $composableBuilder(
+    column: $table.validationComment,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get validatedByName => $composableBuilder(
+    column: $table.validatedByName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get validatedAt => $composableBuilder(
+    column: $table.validatedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -924,6 +1236,11 @@ class $$CollectesTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get missionId => $composableBuilder(
+    column: $table.missionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get agentId => $composableBuilder(
     column: $table.agentId,
     builder: (column) => ColumnOrderings(column),
@@ -956,6 +1273,26 @@ class $$CollectesTableTableOrderingComposer
 
   ColumnOrderings<String> get localStatus => $composableBuilder(
     column: $table.localStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get serverStatus => $composableBuilder(
+    column: $table.serverStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get validationComment => $composableBuilder(
+    column: $table.validationComment,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get validatedByName => $composableBuilder(
+    column: $table.validatedByName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get validatedAt => $composableBuilder(
+    column: $table.validatedAt,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -995,6 +1332,9 @@ class $$CollectesTableTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get missionId =>
+      $composableBuilder(column: $table.missionId, builder: (column) => column);
+
   GeneratedColumn<int> get agentId =>
       $composableBuilder(column: $table.agentId, builder: (column) => column);
 
@@ -1019,6 +1359,26 @@ class $$CollectesTableTableAnnotationComposer
 
   GeneratedColumn<String> get localStatus => $composableBuilder(
     column: $table.localStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get serverStatus => $composableBuilder(
+    column: $table.serverStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get validationComment => $composableBuilder(
+    column: $table.validationComment,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get validatedByName => $composableBuilder(
+    column: $table.validatedByName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get validatedAt => $composableBuilder(
+    column: $table.validatedAt,
     builder: (column) => column,
   );
 
@@ -1070,6 +1430,7 @@ class $$CollectesTableTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<int?> serverId = const Value.absent(),
                 Value<int> formVersionId = const Value.absent(),
+                Value<int?> missionId = const Value.absent(),
                 Value<int?> agentId = const Value.absent(),
                 Value<String> dataJson = const Value.absent(),
                 Value<double?> latitude = const Value.absent(),
@@ -1077,6 +1438,10 @@ class $$CollectesTableTableTableManager
                 Value<String?> photoPaths = const Value.absent(),
                 Value<String?> documentPaths = const Value.absent(),
                 Value<String> localStatus = const Value.absent(),
+                Value<String?> serverStatus = const Value.absent(),
+                Value<String?> validationComment = const Value.absent(),
+                Value<String?> validatedByName = const Value.absent(),
+                Value<DateTime?> validatedAt = const Value.absent(),
                 Value<String?> syncErrorMessage = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -1084,6 +1449,7 @@ class $$CollectesTableTableTableManager
                 id: id,
                 serverId: serverId,
                 formVersionId: formVersionId,
+                missionId: missionId,
                 agentId: agentId,
                 dataJson: dataJson,
                 latitude: latitude,
@@ -1091,6 +1457,10 @@ class $$CollectesTableTableTableManager
                 photoPaths: photoPaths,
                 documentPaths: documentPaths,
                 localStatus: localStatus,
+                serverStatus: serverStatus,
+                validationComment: validationComment,
+                validatedByName: validatedByName,
+                validatedAt: validatedAt,
                 syncErrorMessage: syncErrorMessage,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -1100,6 +1470,7 @@ class $$CollectesTableTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<int?> serverId = const Value.absent(),
                 required int formVersionId,
+                Value<int?> missionId = const Value.absent(),
                 Value<int?> agentId = const Value.absent(),
                 required String dataJson,
                 Value<double?> latitude = const Value.absent(),
@@ -1107,6 +1478,10 @@ class $$CollectesTableTableTableManager
                 Value<String?> photoPaths = const Value.absent(),
                 Value<String?> documentPaths = const Value.absent(),
                 Value<String> localStatus = const Value.absent(),
+                Value<String?> serverStatus = const Value.absent(),
+                Value<String?> validationComment = const Value.absent(),
+                Value<String?> validatedByName = const Value.absent(),
+                Value<DateTime?> validatedAt = const Value.absent(),
                 Value<String?> syncErrorMessage = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -1114,6 +1489,7 @@ class $$CollectesTableTableTableManager
                 id: id,
                 serverId: serverId,
                 formVersionId: formVersionId,
+                missionId: missionId,
                 agentId: agentId,
                 dataJson: dataJson,
                 latitude: latitude,
@@ -1121,6 +1497,10 @@ class $$CollectesTableTableTableManager
                 photoPaths: photoPaths,
                 documentPaths: documentPaths,
                 localStatus: localStatus,
+                serverStatus: serverStatus,
+                validationComment: validationComment,
+                validatedByName: validatedByName,
+                validatedAt: validatedAt,
                 syncErrorMessage: syncErrorMessage,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

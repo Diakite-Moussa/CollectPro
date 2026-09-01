@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "CollectPro (ngrok backend)",
+            "request": "launch",
+            "type": "dart",
+            "args": [
+                "--dart-define=API_URL=https://churn-maximum-chrome.ngrok-free.dev/api"
+            ]
+        },
+        {
+            "name": "CollectPro (backend local :8080)",
+            "request": "launch",
+            "type": "dart",
+            "args": [
+                "--dart-define=API_URL=http://localhost:8080"
+            ]
+        }
+    ]
+}

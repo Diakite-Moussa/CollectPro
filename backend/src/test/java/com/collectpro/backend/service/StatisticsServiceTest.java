@@ -78,7 +78,7 @@ class StatisticsServiceTest {
         when(collecteRepository.countByStatus(CollecteStatus.VALIDATED)).thenReturn(180L);
         when(collecteRepository.countByStatus(CollecteStatus.REJECTED)).thenReturn(10L);
 
-        StatisticsResponse response = statisticsService.getStatistics(superAdmin);
+        StatisticsResponse response = statisticsService.getStatistics(superAdmin, 30);
 
         assertEquals("GLOBAL", response.getScope());
         assertEquals(5L, response.getTotalOrganizations());
@@ -103,7 +103,7 @@ class StatisticsServiceTest {
         when(collecteRepository.countByAgent_OrganizationIdAndStatus(1L, CollecteStatus.VALIDATED)).thenReturn(70L);
         when(collecteRepository.countByAgent_OrganizationIdAndStatus(1L, CollecteStatus.REJECTED)).thenReturn(5L);
 
-        StatisticsResponse response = statisticsService.getStatistics(adminPrincipal);
+        StatisticsResponse response = statisticsService.getStatistics(adminPrincipal, 30);
 
         assertEquals("ORGANIZATION", response.getScope());
         assertEquals(1L, response.getOrganizationId());
@@ -125,7 +125,7 @@ class StatisticsServiceTest {
         when(userRepository.findById(99L)).thenReturn(Optional.of(orphanAdmin));
 
         assertThrows(ResourceNotFoundException.class, () ->
-                statisticsService.getStatistics(orphanAdmin)
+                statisticsService.getStatistics(orphanAdmin, 30)
         );
     }
 
@@ -143,7 +143,7 @@ class StatisticsServiceTest {
         when(collecteRepository.countByAgentInAndStatus(List.of(agent), CollecteStatus.VALIDATED)).thenReturn(20L);
         when(collecteRepository.countByAgentInAndStatus(List.of(agent), CollecteStatus.REJECTED)).thenReturn(2L);
 
-        StatisticsResponse response = statisticsService.getStatistics(supervisor);
+        StatisticsResponse response = statisticsService.getStatistics(supervisor, 30);
 
         assertEquals("TEAM", response.getScope());
         assertEquals(1L, response.getTotalAgents()); // Un seul agent supervisé
@@ -159,7 +159,7 @@ class StatisticsServiceTest {
         when(userRepository.findById(4L)).thenReturn(Optional.of(agent));
 
         assertThrows(ResourceNotFoundException.class, () ->
-                statisticsService.getStatistics(agent)
+                statisticsService.getStatistics(agent, 30)
         );
     }
 }

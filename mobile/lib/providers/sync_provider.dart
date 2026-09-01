@@ -82,6 +82,7 @@ class SyncController extends StateNotifier<SyncState> {
 
     try {
       final result = await _syncService.syncPendingCollectes();
+      await _syncService.pullValidationStatuses();
       state = state.copyWith(
         isSyncing: false,
         lastSyncTime: DateTime.now(),

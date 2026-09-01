@@ -8,6 +8,9 @@ class CollectesTable extends Table {
 
   IntColumn get formVersionId => integer()();
 
+  /// Mission active à laquelle rattacher cette collecte (optionnel).
+  IntColumn get missionId => integer().nullable()();
+
   /// Agent qui a saisi la collecte (User.id côté backend).
   /// Nullable pour compatibilité avec les lignes créées avant cette colonne.
   IntColumn get agentId => integer().nullable()();
@@ -27,6 +30,16 @@ class CollectesTable extends Table {
 
   TextColumn get localStatus =>
       text().withDefault(const Constant('DRAFT'))();
+
+  /// Statut métier renvoyé par le serveur (PENDING_VALIDATION, VALIDATED,
+  /// REJECTED...). Distinct de localStatus qui ne concerne que la synchro.
+  TextColumn get serverStatus => text().nullable()();
+
+  TextColumn get validationComment => text().nullable()();
+
+  TextColumn get validatedByName => text().nullable()();
+
+  DateTimeColumn get validatedAt => dateTime().nullable()();
 
   TextColumn get syncErrorMessage => text().nullable()();
 

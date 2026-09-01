@@ -29,6 +29,10 @@ public class Collecte {
     @JoinColumn(name = "form_version_id", nullable = false)
     private FormVersion formVersion;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "mission_id")
+    private Mission mission;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "data_json", nullable = false, columnDefinition = "jsonb")
     private String dataJson;

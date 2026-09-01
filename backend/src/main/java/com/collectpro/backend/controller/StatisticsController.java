@@ -9,6 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -21,7 +22,8 @@ public class StatisticsController {
     @GetMapping
     @PreAuthorize("@securityAuth.hasPermission(authentication, 'VIEW_STATISTICS')")
     public ResponseEntity<StatisticsResponse> getStatistics(
-            @AuthenticationPrincipal CustomUserDetails principal) {
-        return ResponseEntity.ok(statisticsService.getStatistics(principal.getUser()));
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @RequestParam(name = "days", defaultValue = "30") int days) {
+        return ResponseEntity.ok(statisticsService.getStatistics(principal.getUser(), days));
     }
 }

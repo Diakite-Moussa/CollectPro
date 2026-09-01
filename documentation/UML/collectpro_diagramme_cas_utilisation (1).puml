@@ -1,6 +1,6 @@
 @startuml CollectPro_CasUtilisation
 
-title CollectPro - Diagramme de cas d'utilisation (V1)
+title CollectPro - Diagramme de cas d'utilisation (V1 + V1.1)
 
 left to right direction
 skinparam packageStyle rectangle
@@ -53,6 +53,17 @@ rectangle "CollectPro" {
   usecase "Créer / publier une version de formulaire" as UC_PublishForm
   usecase "Générer des rapports" as UC_Reports
 
+  ' ---- Missions & Cartographie GPS (V1.1) ----
+  usecase "Créer une mission" as UC_CreateMission
+  usecase "Définir une zone GPS pour une mission" as UC_MissionZone
+  usecase "Affecter des agents à une mission" as UC_AssignMissionAgents
+  usecase "Annuler une mission" as UC_CancelMission
+  usecase "Consulter la carte des missions et collectes" as UC_MapView
+  usecase "Exporter les collectes (CSV / Excel)" as UC_ExportData
+  usecase "Générer un rapport de mission" as UC_MissionReport
+  usecase "Consulter l'historique des rapports" as UC_ReportHistory
+  usecase "Consulter les statistiques avancées (tendances, rejets, délais)" as UC_StatsAdvanced
+
   ' ---- Superviseur ----
   usecase "Consulter les agents de son équipe" as UC_ConsultAgents
   usecase "Suivre l'avancement des missions" as UC_SuiviMissions
@@ -93,6 +104,8 @@ SuperAdmin --> UC_SuiviGlobal
 SuperAdmin --> UC_ParamsGlobal
 SuperAdmin --> UC_TransferAdmin
 
+UC_StatsGlobal ..> UC_StatsAdvanced : <<extend>>
+
 ' ==== Administrateur principal ====
 AdminP --> UC_Auth
 AdminP --> UC_CreateAdminS
@@ -104,6 +117,23 @@ AdminP --> UC_StatsOrg
 AdminP --> UC_ManageInvites
 AdminP --> UC_Forms
 AdminP --> UC_Reports
+AdminP --> UC_CreateMission
+AdminP --> UC_AssignMissionAgents
+AdminP --> UC_CancelMission
+AdminP --> UC_MapView
+AdminP --> UC_ExportData
+
+UC_CreateMission ..> UC_MissionZone : <<extend>>
+UC_Reports ..> UC_MissionReport : <<extend>>
+UC_Reports ..> UC_ReportHistory : <<include>>
+UC_StatsOrg ..> UC_StatsAdvanced : <<extend>>
+
+note right of UC_MissionZone
+  Zone GPS optionnelle (centre + rayon).
+  Une collecte hors de cette zone est
+  signalée (outsideMissionZone) sans être
+  bloquée.
+end note
 
 ' ==== Administrateur secondaire ====
 AdminS --> UC_Auth
@@ -130,6 +160,10 @@ Sup --> UC_ConsultCollectesEquipe
 Sup --> UC_Valider
 Sup --> UC_Rejeter
 Sup --> UC_Activate
+Sup --> UC_MapView
+Sup --> UC_ReportHistory
+
+UC_SuiviMissions ..> UC_MapView : <<extend>>
 
 note right of Sup
   Le Superviseur ne possède pas la

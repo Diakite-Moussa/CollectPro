@@ -1,0 +1,34 @@
+package com.collectpro.backend.dto;
+
+import com.collectpro.backend.enums.MissionStatus;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.time.LocalDateTime;
+
+@Getter
+@Setter
+public class UpdateMissionRequest {
+
+    @NotBlank(message = "Le nom de la mission est obligatoire")
+    private String name;
+
+    private String description;
+
+    private MissionStatus status;
+
+    private LocalDateTime startDate;
+
+    private LocalDateTime endDate;
+
+    private Double latitude;
+
+    private Double longitude;
+
+    private Double radiusMeters;
+
+    @Positive(message = "Le nombre de collectes attendues doit être positif")
+    private Integer expectedCollectesCount;
+}

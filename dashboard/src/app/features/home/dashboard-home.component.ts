@@ -5,12 +5,16 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule, MatButtonToggleChange } from '@angular/material/button-toggle';
+import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { ChartConfiguration, ChartData } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
 import { StatisticsService } from '../../core/services/statistics.service';
 import { CollecteService } from '../../core/services/collecte.service';
 import { CollecteResponse } from '../../core/models/collecte.model';
+import { AgentRejectionRate } from '../../core/models/statistics.model';
 import { AuthService } from '../../core/services/auth.service';
+import { ReportHistoryDialogComponent } from '../reports/report-history-dialog.component';
 
 @Component({
   selector: 'app-dashboard-home',
@@ -22,13 +26,20 @@ import { AuthService } from '../../core/services/auth.service';
     MatTableModule,
     MatChipsModule,
     MatButtonModule,
+    MatButtonToggleModule,
+    MatDialogModule,
     BaseChartDirective
   ],
   template: `
     <div class="dashboard-home">
       <div class="welcome-header">
-        <h2>Tableau de bord — Vue Générale</h2>
-        <p>Bienvenue {{ user()?.firstName }} ({{ user()?.organizationName || 'Super Admin' }})</p>
+        <div>
+          <h2>Tableau de bord — Vue Générale</h2>
+          <p>Bienvenue {{ user()?.firstName }} ({{ user()?.organizationName || 'Super Admin' }})</p>
+        </div>
+        <button *ngIf="user()?.organizationId" mat-raised-button color="primary" (click)="openOrgReports()">
+          <mat-icon>analytics</mat-icon> Rapports PDF
+        </button>
       </div>
 
       <div class="stats-grid">
@@ -71,6 +82,16 @@ import { AuthService } from '../../core/services/auth.service';
             </div>
           </mat-card-content>
         </mat-card>
+
+        <mat-card class="stat-card teal">
+          <mat-card-content class="stat-content">
+            <div class="stat-icon"><mat-icon>schedule</mat-icon></div>
+            <div class="stat-info">
+              <span class="stat-value">{{ formattedAvgValidationTime }}</span>
+              <span class="stat-label">Délai Moyen de Validation</span>
+            </div>
+          </mat-card-content>
+        </mat-card>
       </div>
 
       <div class="charts-grid mt-6" *ngIf="hasChartData">
@@ -100,6 +121,45 @@ import { AuthService } from '../../core/services/auth.service';
           </mat-card-content>
         </mat-card>
       </div>
+
+      <mat-card class="chart-card trend-card mt-6" *ngIf="hasChartData">
+        <mat-card-header class="trend-header">
+          <mat-card-title>Évolution des Collectes</mat-card-title>
+          <mat-button-toggle-group [value]="selectedDays" (change)="onPeriodChange($event)">
+            <mat-button-toggle [value]="7">7j</mat-button-toggle>
+            <mat-button-toggle [value]="30">30j</mat-button-toggle>
+            <mat-button-toggle [value]="90">90j</mat-button-toggle>
+          </mat-button-toggle-group>
+        </mat-card-header>
+        <mat-card-content class="chart-content trend-content">
+          <canvas baseChart
+            *ngIf="trendChartData.labels?.length; else noTrend"
+            [data]="trendChartData"
+            [type]="'line'"
+            [options]="lineOptions">
+          </canvas>
+          <ng-template #noTrend>
+            <p class="empty-state">Aucune collecte sur cette période</p>
+          </ng-template>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card class="rejection-card mt-6" *ngIf="rejectionByAgent.length">
+        <mat-card-header>
+          <mat-card-title>Taux de Rejet par Agent</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="rejection-row" *ngFor="let a of sortedRejectionByAgent">
+            <span class="agent-name">{{ a.firstName }} {{ a.lastName }}</span>
+            <div class="rejection-bar-track">
+              <div class="rejection-bar-fill" [style.width.%]="a.rejectionRatePercent"
+                   [class.high]="a.rejectionRatePercent >= 30"></div>
+            </div>
+            <span class="rejection-value">{{ a.rejectionRatePercent | number:'1.0-1' }}%</span>
+            <span class="rejection-count">({{ a.rejectedCount }}/{{ a.totalCount }})</span>
+          </div>
+        </mat-card-content>
+      </mat-card>
 
       <mat-card class="recent-card mt-6">
         <mat-card-header>
@@ -150,13 +210,19 @@ import { AuthService } from '../../core/services/auth.service';
   `,
   styles: [`
     .welcome-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      gap: 1rem;
       h2 {
         font-weight: 700;
         margin-bottom: 0.2rem;
       }
       p {
         color: #64748b;
+        margin: 0;
       }
     }
     .stats-grid {
@@ -203,6 +269,7 @@ import { AuthService } from '../../core/services/auth.service';
       &.green .stat-icon { background: #10b981; }
       &.purple .stat-icon { background: #8b5cf6; }
       &.orange .stat-icon { background: #f59e0b; }
+      &.teal .stat-icon { background: #14b8a6; }
     }
     .charts-grid {
       display: grid;
@@ -220,6 +287,59 @@ import { AuthService } from '../../core/services/auth.service';
       justify-content: center;
       padding: 1rem;
     }
+    .trend-card {
+      .trend-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+      }
+    }
+    .trend-content {
+      height: 260px;
+    }
+    .rejection-card {
+      border-radius: 12px;
+      border: none;
+    }
+    .rejection-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #f1f5f9;
+      &:last-child { border-bottom: none; }
+    }
+    .agent-name {
+      flex: 0 0 160px;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    .rejection-bar-track {
+      flex: 1;
+      height: 8px;
+      background: #f1f5f9;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .rejection-bar-fill {
+      height: 100%;
+      background: #f59e0b;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+      &.high { background: #ef4444; }
+    }
+    .rejection-value {
+      flex: 0 0 50px;
+      text-align: right;
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+    .rejection-count {
+      flex: 0 0 60px;
+      color: #94a3b8;
+      font-size: 0.8rem;
+    }
     .mt-6 {
       margin-top: 1.5rem;
     }
@@ -236,12 +356,18 @@ import { AuthService } from '../../core/services/auth.service';
       border-radius: 6px;
       font-size: 0.8rem;
     }
+    .empty-state {
+      text-align: center;
+      color: #94a3b8;
+      padding: 2rem;
+    }
   `]
 })
 export class DashboardHomeComponent implements OnInit {
   private authService = inject(AuthService);
   private statisticsService = inject(StatisticsService);
   private collecteService = inject(CollecteService);
+  private dialog = inject(MatDialog);
 
   user = this.authService.currentUser;
   isSuperAdmin = false;
@@ -249,10 +375,27 @@ export class DashboardHomeComponent implements OnInit {
   formCount = 0;
   collecteCount = 0;
   pendingCount = 0;
+
+  openOrgReports(): void {
+    const orgId = this.user()?.organizationId;
+    if (!orgId) return;
+    this.dialog.open(ReportHistoryDialogComponent, {
+      width: '750px',
+      data: {
+        title: this.user()?.organizationName || 'Organisation',
+        type: 'ORGANIZATION',
+        targetId: orgId,
+        canGenerate: this.user()?.role === 'ADMIN_PRINCIPAL' || this.user()?.role === 'ADMIN_SECONDAIRE'
+      }
+    });
+  }
   recentCollectes: CollecteResponse[] = [];
   displayedColumns = ['id', 'agent', 'coords', 'status', 'createdAt'];
 
   hasChartData = false;
+  selectedDays = 30;
+  rejectionByAgent: AgentRejectionRate[] = [];
+  avgValidationTimeHours: number | null = null;
 
   collecteStatusChartData: ChartData<'doughnut'> = {
     labels: ['En attente', 'Validées', 'Rejetées'],
@@ -270,6 +413,19 @@ export class DashboardHomeComponent implements OnInit {
       data: [0, 0, 0],
       backgroundColor: ['#2563eb', '#8b5cf6', '#10b981'],
       borderRadius: 6
+    }]
+  };
+
+  trendChartData: ChartData<'line'> = {
+    labels: [],
+    datasets: [{
+      label: 'Collectes reçues',
+      data: [],
+      borderColor: '#2563eb',
+      backgroundColor: 'rgba(37, 99, 235, 0.1)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 3
     }]
   };
 
@@ -292,12 +448,60 @@ export class DashboardHomeComponent implements OnInit {
     }
   };
 
+  lineOptions: ChartConfiguration<'line'>['options'] = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false }
+    },
+    scales: {
+      y: { beginAtZero: true, ticks: { precision: 0 } }
+    }
+  };
+
+  get sortedRejectionByAgent(): AgentRejectionRate[] {
+    return [...this.rejectionByAgent].sort((a, b) => b.rejectionRatePercent - a.rejectionRatePercent);
+  }
+
+  get formattedAvgValidationTime(): string {
+    if (this.avgValidationTimeHours === null || this.avgValidationTimeHours === undefined) {
+      return '—';
+    }
+    if (this.avgValidationTimeHours < 1) {
+      return `${Math.round(this.avgValidationTimeHours * 60)} min`;
+    }
+    if (this.avgValidationTimeHours < 24) {
+      return `${this.avgValidationTimeHours.toFixed(1)} h`;
+    }
+    return `${(this.avgValidationTimeHours / 24).toFixed(1)} j`;
+  }
+
   ngOnInit(): void {
     const role = this.user()?.role;
     this.isSuperAdmin = role === 'SUPER_ADMIN';
 
-    // Un seul appel au service de statistiques du backend
-    this.statisticsService.getStatistics().subscribe({
+    this.loadStatistics(this.selectedDays);
+
+    // Chargement du tableau des dernières collectes récentes
+    const collectes$ = role === 'SUPERVISOR'
+      ? this.collecteService.getTeamCollectes()
+      : this.collecteService.getOrganizationCollectes();
+
+    collectes$.subscribe({
+      next: (collectes) => {
+        this.recentCollectes = collectes.slice(0, 5);
+      },
+      error: () => { }
+    });
+  }
+
+  onPeriodChange(event: MatButtonToggleChange): void {
+    this.selectedDays = event.value;
+    this.loadStatistics(this.selectedDays);
+  }
+
+  private loadStatistics(days: number): void {
+    this.statisticsService.getStatistics(days).subscribe({
       next: (stats) => {
         if (stats.scope === 'GLOBAL') {
           this.orgCount = stats.activeOrganizations ?? 0;
@@ -307,6 +511,8 @@ export class DashboardHomeComponent implements OnInit {
         this.formCount = stats.publishedForms ?? 0;
         this.collecteCount = stats.totalCollectes ?? 0;
         this.pendingCount = stats.pendingCollectes ?? 0;
+        this.avgValidationTimeHours = stats.avgValidationTimeHours ?? null;
+        this.rejectionByAgent = stats.rejectionByAgent ?? [];
 
         this.collecteStatusChartData = {
           ...this.collecteStatusChartData,
@@ -324,22 +530,24 @@ export class DashboardHomeComponent implements OnInit {
           }]
         };
 
+        const trend = stats.collecteTrend ?? [];
+        this.trendChartData = {
+          labels: trend.map(t => this.formatTrendDate(t.date)),
+          datasets: [{
+            ...this.trendChartData.datasets[0],
+            data: trend.map(t => t.count)
+          }]
+        };
+
         this.hasChartData = true;
       },
-      error: () => {}
+      error: () => { }
     });
+  }
 
-    // Chargement du tableau des dernières collectes récentes
-    const collectes$ = role === 'SUPERVISOR'
-      ? this.collecteService.getTeamCollectes()
-      : this.collecteService.getOrganizationCollectes();
-
-    collectes$.subscribe({
-      next: (collectes) => {
-        this.recentCollectes = collectes.slice(0, 5);
-      },
-      error: () => {}
-    });
+  private formatTrendDate(isoDate: string): string {
+    const d = new Date(isoDate);
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
   }
 
   getStatusColor(status: string): string {

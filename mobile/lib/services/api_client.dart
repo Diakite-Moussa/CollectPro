@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'token_storage.dart';
+import '../constante/environnement.dart';
 
 String get kBaseUrl {
   const envUrl = String.fromEnvironment('API_URL');
@@ -8,7 +9,7 @@ String get kBaseUrl {
     return envUrl;
   }
   if (kIsWeb) {
-    return 'http://localhost:8080';
+    return Environnement().webappUrl;
   }
   if (defaultTargetPlatform == TargetPlatform.android) {
     return 'http://10.0.2.2:8080';

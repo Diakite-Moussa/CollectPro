@@ -1,6 +1,6 @@
 @startuml CollectPro_DiagrammeSequence
 
-title CollectPro - Séquence : Organisation, Comptes, Collecte, Synchronisation et Validation
+title CollectPro - Séquence : Organisation, Comptes, Collecte, Synchronisation, Validation, Missions et Rapports (V1 + V1.1)
 
 actor "Super Admin" as SuperAdmin
 actor "Admin principal /\nAdmin secondaire" as AdminP
@@ -207,5 +207,90 @@ else collecte rejetée
     deactivate API
     Dash --> Sup : Collecte rejetée
 end
+
+== 4. Création d'une mission avec zone GPS (V1.1) ==
+
+AdminP -> Dash : Créer une mission (nom, formulaires, échéances)
+AdminP -> Dash : Définir une zone GPS (latitude, longitude, rayon) et l'objectif de collectes
+Dash -> API : POST /missions (organization_id, zone GPS, expectedCollectesCount, formIds)
+activate API
+API -> API : Vérifier permission CREATE_MISSION
+API -> DB : INSERT mission (status = DRAFT ou ACTIVE)
+DB --> API : Confirmation
+API --> Dash : 201 Created
+deactivate API
+AdminP -> Dash : Affecter des agents à la mission
+Dash -> API : POST /missions/{id}/agents (agentIds)
+activate API
+API -> DB : INSERT mission_agents
+API --> Dash : 200 OK
+deactivate API
+
+note over Agent, API
+  Lors d'une création de collecte (section 2), si la
+  collecte référence une mission, le backend calcule
+  la distance GPS (formule de Haversine) entre la
+  position de la collecte et le centre de la zone.
+  Au-delà du rayon défini, la collecte est marquée
+  outsideMissionZone = true, sans être bloquée.
+end note
+
+Sup -> Dash : Consulter la progression de la mission
+Dash -> API : GET /missions/{id}/progress
+activate API
+API -> DB : SELECT collectes WHERE mission_id (agrégation reçues vs expectedCollectesCount)
+DB --> API : Décompte des collectes
+API --> Dash : MissionProgressResponse (progressPercent plafonné à 100)
+deactivate API
+Dash --> Sup : Barre de progression + carte des collectes (Leaflet)
+
+== 5. Génération et téléchargement d'un rapport PDF (V1.1) ==
+
+AdminP -> Dash : Générer un rapport (organisation ou mission), période optionnelle
+Dash -> API : POST /reports/organizations/{id} ou /reports/missions/{id} (periodStart, periodEnd)
+activate API
+API -> API : Vérifier permission GENERATE_REPORT
+API -> DB : Agréger les données (collectes, rejets par agent, progression) via ReportDataService
+DB --> API : Données agrégées
+API -> API : Générer le PDF (OrganizationReportGenerator ou MissionReportGenerator, OpenPDF)
+note right of API
+  Le PDF inclut le logo de l'organisation en
+  en-tête (Organization.logoUrl) si défini,
+  sinon un en-tête neutre.
+end note
+API -> API : Stocker le fichier (FileStorageService)
+API -> DB : INSERT report (type, file_path, generated_by, period_start, period_end)
+DB --> API : Confirmation
+API --> Dash : 200 OK (ReportResponse)
+deactivate API
+Dash -> API : GET /reports/{id}/download
+activate API
+API -> API : Vérifier permission VIEW_REPORT
+API --> Dash : Fichier PDF (application/pdf)
+deactivate API
+Dash --> AdminP : Téléchargement du rapport
+
+AdminP -> Dash : Consulter l'historique des rapports
+Dash -> API : GET /reports/organizations/{id} ou /reports/missions/{id}
+activate API
+API -> DB : SELECT reports (paginé)
+DB --> API : Liste des rapports générés
+API --> Dash : Page<ReportResponse>
+deactivate API
+Dash --> AdminP : Historique affiché (date, auteur, téléchargement)
+
+== 6. Export CSV / Excel des collectes (V1.1) ==
+
+AdminP -> Dash : Exporter les collectes (filtres : mission, formulaire, statut, période)
+Dash -> API : GET /collectes/export/csv ou /collectes/export/excel (filtres)
+activate API
+API -> API : Vérifier organisation de l'utilisateur (isolation multi-tenant)
+API -> DB : SELECT collectes filtrées
+DB --> API : Liste des collectes
+API -> API : Neutraliser les préfixes de formule (=, +, -, @) contre l'injection CSV/Excel (OWASP)
+API -> API : Générer le fichier (CSV avec BOM UTF-8, ou XLSX via Apache POI)
+API --> Dash : Fichier (blob)
+deactivate API
+Dash --> AdminP : Téléchargement du fichier
 
 @enduml

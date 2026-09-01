@@ -1,6 +1,6 @@
 # 📌 CollectPro — Plateforme Enterprise de Collecte de Données Terrain Offline-First
 
-[![Version](https://img.shields.io/badge/version-1.0.0--RELEASE-blue.svg)](https://github.com/Diakite-Moussa/CollectPro)
+[![Version](https://img.shields.io/badge/version-1.1.0--RELEASE-blue.svg)](https://github.com/Diakite-Moussa/CollectPro)
 [![Backend](https://img.shields.io/badge/Backend-Spring%20Boot%204.1-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![Frontend](https://img.shields.io/badge/Dashboard-Angular%2021-red.svg)](https://angular.dev/)
 [![Mobile](https://img.shields.io/badge/Mobile-Flutter%203-02569B.svg)](https://flutter.dev/)
@@ -29,12 +29,15 @@ La plateforme repose sur une architecture **Offline-First** : les agents saisiss
 - **Journal d'Audit Global (`audit_logs`)** : Traçabilité complète des actions sensibles (créations de comptes, modifications d'organisations, validations, réinitialisations de mots de passe).
 - **Journal de Synchronisation (`sync_logs`)** : Suivi des tentatives de synchronisation des agents terrain, filtrable par équipe pour les superviseurs.
 - **Profil Utilisateur** : Consultation/modification des informations personnelles et changement de mot de passe, accessible à tous les rôles.
-- **Statistiques & KPI en Temps Réel** : Tableau de bord unifié par rôle (`SUPER_ADMIN`, `ADMIN_PRINCIPAL`, `SUPERVISOR`).
+- **Statistiques & KPI en Temps Réel** *(V1.1)* : Tableau de bord unifié par rôle avec tendance des collectes (courbe 7/30/90j), taux de rejet par agent, temps moyen de validation, agrégation à trois échelles (globale / organisation / équipe).
 - **Gestion Multi-Tenant** : Isolation hermétique des données et utilisateurs par organisation.
+- **Missions & Cartographie GPS** *(V1.1)* : Création de missions avec zone géographique (centre GPS + rayon), suivi de la progression (collectes reçues vs attendues), visualisation cartographique Leaflet (missions et collectes) et détection automatique des collectes hors zone.
+- **Rapports PDF Automatiques** *(V1.1)* : Génération de rapports par organisation ou par mission (OpenPDF), avec en-tête personnalisé par logo d'organisation, filtrage par période, historique des rapports générés et téléchargement.
+- **Export Avancé des Données** *(V1.1)* : Export des collectes au format CSV ou Excel (`.xlsx`, Apache POI), avec neutralisation des injections de formules (OWASP CSV Injection).
 
 ### ⚙️ Backend Core API (Spring Boot 4.1 / Java 21)
 - **Sécurité RBAC & JWT** : Authentification stateless avec rotation des Refresh Tokens et contrôle d'accès fin par SpEL `@PreAuthorize`.
-- **Migrations de Base de Données (Flyway)** : Évolutions de schéma automatisées et versionnées (`V1` à `V4`).
+- **Migrations de Base de Données (Flyway)** : Évolutions de schéma automatisées et versionnées (`V1` à `V8` : missions géolocalisées, objectif de collectes, rapports, logo organisation).
 - **Pattern Journal d'Audit Isolation (`REQUIRES_NEW`)** : Enregistrement d'audit indépendant empêchant l'annulation des logs en cas d'incident métier.
 - **Haut Niveau de Robustesse** : Traitement des pièces jointes multipart, sécurisation CORS externalisée et déploiement *Fail-Fast* en production.
 
@@ -65,10 +68,10 @@ graph TD
 | Rôle | Périmètre d'accès | Fonctionnalités principales |
 | :--- | :--- | :--- |
 | 🛡️ **Super Admin** | Global (Plateforme) | Gestion des organisations, création des admins principaux, statistiques globales, audit trail complet. |
-| 🏢 **Admin Principal** | Organisation | Gestion des utilisateurs de l'org, création des formulaires, affectation superviseurs-agents, audit org. |
-| 👤 **Admin Secondaire** | Organisation (Restreint) | Gestion déléguée des utilisateurs et formulaires selon permissions attribuées. |
-| 👁️ **Superviseur** | Équipe d'Agents | Consultation des collectes de l'équipe, **Validation/Rejet des collectes (RF-012)**, suivi d'activité. |
-| 📲 **Agent Terrain** | Personnel | Saisie offline, capture GPS/Photos, synchronisation vers le serveur. |
+| 🏢 **Admin Principal** | Organisation | Gestion des utilisateurs de l'org, création des formulaires, affectation superviseurs-agents, audit org, **gestion des missions** (`CREATE_MISSION`/`UPDATE_MISSION`/`ASSIGN_MISSION`/`CANCEL_MISSION`), **génération de rapports** (`GENERATE_REPORT`). |
+| 👤 **Admin Secondaire** | Organisation (Restreint) | Gestion déléguée des utilisateurs et formulaires selon permissions attribuées (aucune permission par défaut ; personnalisable via `user_permissions`). |
+| 👁️ **Superviseur** | Équipe d'Agents | Consultation des collectes de l'équipe, **Validation/Rejet des collectes (RF-012)**, suivi d'activité, consultation des missions et des rapports (`VIEW_MISSION`, `VIEW_REPORT`). |
+| 📲 **Agent Terrain** | Personnel | Saisie offline, capture GPS/Photos, synchronisation vers le serveur, consultation des missions attribuées. |
 
 ---
 
@@ -78,11 +81,13 @@ graph TD
 CollectPro/
 ├── backend/                  # API REST Spring Boot 4.1 (Java 21, PostgreSQL, Flyway)
 │   ├── src/main/java/        # Modèle, Contrôleurs, Services, Sécurité JWT & Audit
-│   ├── src/main/resources/   # App YML (dev/prod), Migrations Flyway db/migration (V1..V4)
+│   │   └── service/report/   # Générateurs PDF (OpenPDF) pour rapports organisation/mission
+│   ├── src/main/resources/   # App YML (dev/prod), Migrations Flyway db/migration (V1..V8)
 │   └── Dockerfile            # Image Docker multi-stage pour le backend
 ├── dashboard/                # Application Web Angular 21 (Angular Material, Signals, RxJS)
 │   ├── src/app/core/         # Services HTTP, Modèles, Intercepteurs JWT
-│   ├── src/app/features/     # Composants d'écrans (Form Builder, Audit Logs, Collectes)
+│   ├── src/app/features/     # Composants d'écrans (Form Builder, Audit Logs, Collectes, Missions, Reports)
+│   ├── src/app/shared/       # Composants partagés (carte Leaflet `map-view`)
 │   └── src/environments/     # Configurations d'environnements (environment.ts / environment.prod.ts)
 ├── mobile/                   # Application Mobile Flutter 3 (Android uniquement en V1)
 │   ├── lib/data/local/       # SQLite & Accessors DAO (Drift)

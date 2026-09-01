@@ -14,6 +14,7 @@ public class OrganizationResponse {
     private String description;
     private OrganizationStatus status;
     private LocalDateTime createdAt;
+    private String logoUrl; // ← ajouté
     private UserSummary principalAdmin;
 
     @Getter
@@ -25,4 +26,6 @@ public class OrganizationResponse {
         private String email;
         private String status;
     }
+
+
 }

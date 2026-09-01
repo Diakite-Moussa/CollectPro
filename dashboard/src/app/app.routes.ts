@@ -14,6 +14,8 @@ import { ForgotPasswordComponent } from './features/auth/forgot-password.compone
 import { ResetPasswordComponent } from './features/auth/reset-password.component';
 import { ProfileComponent } from './features/profile/profile.component';
 import { SyncLogListComponent } from './features/sync-logs/sync-log-list.component';
+import { MissionListComponent } from './features/missions/mission-list.component';
+
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -33,7 +35,8 @@ export const routes: Routes = [
       { path: 'collectes', component: CollecteListComponent, canActivate: [roleGuard] },
       { path: 'sync-logs', component: SyncLogListComponent, canActivate: [roleGuard] },
       { path: 'audit-logs', component: AuditLogsComponent, canActivate: [roleGuard] },
-      { path: 'profile', component: ProfileComponent }
+      { path: 'profile', component: ProfileComponent },
+      { path: 'missions', component: MissionListComponent, canActivate: [roleGuard] },
     ]
   },
   { path: '**', redirectTo: 'login' }

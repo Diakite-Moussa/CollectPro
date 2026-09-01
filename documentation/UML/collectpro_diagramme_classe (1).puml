@@ -59,6 +59,18 @@ enum SyncStatus {
   FAILED
 }
 
+enum MissionStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ReportType {
+  ORGANIZATION
+  MISSION
+}
+
 class Organization {
   - id : Long
   - name : String
@@ -208,6 +220,52 @@ class AuditLog {
   - createdAt : DateTime
 }
 
+class Mission {
+  - id : Long
+  - name : String
+  - description : String
+  - status : MissionStatus
+  - startDate : DateTime
+  - endDate : DateTime
+  - latitude : Double
+  - longitude : Double
+  - radiusMeters : Double
+  - expectedCollectesCount : Integer
+  - createdAt : DateTime
+  - updatedAt : DateTime
+}
+note right of Mission
+  latitude/longitude/radiusMeters définissent
+  une zone GPS optionnelle. Une collecte dont
+  la position dépasse le rayon est signalée
+  comme hors zone (outsideMissionZone), sans
+  bloquer sa création.
+end note
+
+class MissionAgent {
+  - id : Long
+  - assignedAt : DateTime
+}
+note right of MissionAgent
+  Table d'association Mission <-> Agent
+  (affectation des agents à une mission).
+end note
+
+class Report {
+  - id : Long
+  - type : ReportType
+  - filePath : String
+  - generatedAt : DateTime
+  - periodStart : DateTime
+  - periodEnd : DateTime
+}
+note right of Report
+  Un rapport ORGANIZATION n'a pas de mission
+  associée ; un rapport MISSION en a
+  obligatoirement une (contrainte SQL
+  chk_report_mission_consistency).
+end note
+
 ' ---- Relations : Organisation / Utilisateurs / Rôles ----
 
 Organization "1" -- "0..*" User : possède >
@@ -256,6 +314,26 @@ Collecte "1" -- "*" SyncLog : génère >
 User "1" -- "*" AuditLog : réalise >
 Organization "1" -- "*" AuditLog : concerne >
 
+' ---- Relations : Missions (V1.1) ----
+
+Organization "1" -- "*" Mission : planifie >
+User "1" -- "*" Mission : crée (créateur) >
+Mission "1" -- "*" MissionAgent : assigne >
+MissionAgent "*" -- "1" User : agent affecté >
+Mission "*" -- "*" Form : cible (mission_forms) >
+Mission "1" -- "0..*" Collecte : rattache >
+note on link
+  Une collecte ne peut être rattachée qu'à
+  une mission ACTIVE de la même organisation
+  que l'agent.
+end note
+
+' ---- Relations : Rapports (V1.1) ----
+
+Organization "1" -- "*" Report : génère >
+Mission "0..1" -- "*" Report : concerne >
+User "1" -- "*" Report : génère (auteur) >
+
 ' ---- Attributs typés (enums) ----
 
 Organization "1" *-- "1" OrganizationStatus
@@ -265,5 +343,7 @@ Form "1" *-- "1" FormStatus
 Collecte "1" *-- "1" CollecteStatus
 Validation "1" *-- "1" ValidationDecision
 SyncLog "1" *-- "1" SyncStatus
+Mission "1" *-- "1" MissionStatus
+Report "1" *-- "1" ReportType
 
 @enduml

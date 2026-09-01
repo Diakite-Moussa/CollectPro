@@ -56,10 +56,10 @@ app:
 
   super-admin:
     email: ${SUPER_ADMIN_EMAIL:superadmin@collectepro.local}
-    password: ${SUPER_ADMIN_PASSWORD}
+    password: ${SUPER_ADMIN_PASSWORD:changeme123}
 
   storage:
     upload-dir: ${UPLOAD_DIR:uploads}
 
   cors:
-    allowed-origins: http://localhost:*,http://127.0.0.1:*
+    allowed-origins: http://localhost:*,http://127.0.0.1:*,http://192.168.*.*:*,https://collectepro.web.app,https://collectepro.firebaseapp.com

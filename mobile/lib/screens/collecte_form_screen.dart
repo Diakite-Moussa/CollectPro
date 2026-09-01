@@ -6,8 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../models/form_schema.dart';
+import '../models/mission.dart';
 import '../providers/auth_provider.dart';
 import '../providers/database_provider.dart';
+import '../providers/sync_provider.dart';
+import '../screens/mission_list_screen.dart' show myMissionsProvider;
 import '../services/location_service.dart';
 import '../services/media_service.dart';
 import '../theme/app_theme.dart';
@@ -21,12 +24,28 @@ class CollecteFormScreen extends ConsumerStatefulWidget {
   final int formVersionId;
   final String formTitle;
   final String schemaJson;
+  final int? localCollecteId;
+  final int? serverCollecteId;
+  final Map<String, dynamic>? initialAnswers;
+  final double? initialLatitude;
+  final double? initialLongitude;
+  final List<String>? initialPhotoPaths;
+  final List<String>? initialDocumentPaths;
+  final bool isResubmit;
 
   const CollecteFormScreen({
     super.key,
     required this.formVersionId,
     required this.formTitle,
     required this.schemaJson,
+    this.localCollecteId,
+    this.serverCollecteId,
+    this.initialAnswers,
+    this.initialLatitude,
+    this.initialLongitude,
+    this.initialPhotoPaths,
+    this.initialDocumentPaths,
+    this.isResubmit = false,
   });
 
   @override
@@ -51,11 +70,31 @@ class _CollecteFormScreenState extends ConsumerState<CollecteFormScreen> {
   final List<String> _photoPaths = [];
   final List<String> _documentPaths = [];
 
+  // Mission State
+  int? _selectedMissionId;
+
   @override
   void initState() {
     super.initState();
     _schema = FormSchema.fromJsonString(widget.schemaJson);
-    _captureGps();
+
+    if (widget.initialAnswers != null) {
+      _answers.addAll(widget.initialAnswers!);
+    }
+    if (widget.initialLatitude != null && widget.initialLongitude != null) {
+      _latitude = widget.initialLatitude;
+      _longitude = widget.initialLongitude;
+    }
+    if (widget.initialPhotoPaths != null) {
+      _photoPaths.addAll(widget.initialPhotoPaths!);
+    }
+    if (widget.initialDocumentPaths != null) {
+      _documentPaths.addAll(widget.initialDocumentPaths!);
+    }
+
+    if (!widget.isResubmit && (_latitude == null || _longitude == null)) {
+      _captureGps();
+    }
   }
 
   Future<void> _captureGps() async {
@@ -106,30 +145,86 @@ class _CollecteFormScreenState extends ConsumerState<CollecteFormScreen> {
 
     setState(() => _submitting = true);
 
-    final agentId = ref.read(authControllerProvider).user?.id;
     final dao = ref.read(collecteDaoProvider);
+    final dataJson = jsonEncode(_answers);
 
-    await dao.insertCollecte(
-      formVersionId: widget.formVersionId,
-      dataJson: jsonEncode(_answers),
-      agentId: agentId,
-      latitude: _latitude,
-      longitude: _longitude,
-      photoPaths: _photoPaths.isNotEmpty ? _photoPaths : null,
-      documentPaths: _documentPaths.isNotEmpty ? _documentPaths : null,
-      readyForSync: true,
-    );
+    try {
+      if (widget.isResubmit) {
+        if (widget.serverCollecteId != null) {
+          final syncService = ref.read(syncServiceProvider);
+          await syncService.resubmitCollecte(
+            serverId: widget.serverCollecteId!,
+            dataJson: dataJson,
+            latitude: _latitude,
+            longitude: _longitude,
+          );
+        }
 
-    if (!mounted) return;
-    setState(() => _submitting = false);
+        if (widget.localCollecteId != null) {
+          await dao.updateCollecte(
+            localId: widget.localCollecteId!,
+            dataJson: dataJson,
+            latitude: _latitude,
+            longitude: _longitude,
+            photoPaths: _photoPaths.isNotEmpty ? _photoPaths : null,
+            documentPaths: _documentPaths.isNotEmpty ? _documentPaths : null,
+            readyForSync: false,
+          );
+          if (widget.serverCollecteId != null) {
+            await dao.updateValidationStatus(
+              serverId: widget.serverCollecteId!,
+              serverStatus: 'PENDING_VALIDATION',
+              validationComment: null,
+            );
+          }
+        }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Collecte enregistrée localement (prête à synchroniser)'),
-        backgroundColor: Colors.green,
-      ),
-    );
-    context.pop();
+        if (!mounted) return;
+        setState(() => _submitting = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Collecte corrigée et renvoyée avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        context.pop();
+      } else {
+        final agentId = ref.read(authControllerProvider).user?.id;
+
+        await dao.insertCollecte(
+          formVersionId: widget.formVersionId,
+          dataJson: dataJson,
+          agentId: agentId,
+          missionId: _selectedMissionId,
+          latitude: _latitude,
+          longitude: _longitude,
+          photoPaths: _photoPaths.isNotEmpty ? _photoPaths : null,
+          documentPaths: _documentPaths.isNotEmpty ? _documentPaths : null,
+          readyForSync: true,
+        );
+
+        if (!mounted) return;
+        setState(() => _submitting = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Collecte enregistrée localement (prête à synchroniser)'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        context.pop();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur : $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -144,6 +239,11 @@ class _CollecteFormScreenState extends ConsumerState<CollecteFormScreen> {
           children: [
             // Banner GPS Status
             _buildGpsCard(),
+
+            const SizedBox(height: 16),
+
+            // Sélection de mission (optionnel)
+            _buildMissionSelector(),
 
             const SizedBox(height: 16),
 
@@ -358,6 +458,7 @@ class _CollecteFormScreenState extends ConsumerState<CollecteFormScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
+        initialValue: _answers[field.key]?.toString(),
         decoration: InputDecoration(labelText: field.label + (field.required ? ' *' : '')),
         maxLines: maxLines,
         keyboardType: keyboardType,
@@ -378,9 +479,15 @@ class _CollecteFormScreenState extends ConsumerState<CollecteFormScreen> {
   }
 
   Widget _dateField(FormFieldDef field) {
+    DateTime? initialDateVal;
+    if (_answers[field.key] != null) {
+      initialDateVal = DateTime.tryParse(_answers[field.key].toString());
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: FormField<DateTime>(
+        initialValue: initialDateVal,
         validator: (value) {
           if (field.required && value == null) return 'Ce champ est obligatoire';
           return null;
@@ -390,7 +497,7 @@ class _CollecteFormScreenState extends ConsumerState<CollecteFormScreen> {
             onTap: () async {
               final picked = await showDatePicker(
                 context: context,
-                initialDate: DateTime.now(),
+                initialDate: state.value ?? DateTime.now(),
                 firstDate: DateTime(2000),
                 lastDate: DateTime(2100),
               );
@@ -417,9 +524,13 @@ class _CollecteFormScreenState extends ConsumerState<CollecteFormScreen> {
   }
 
   Widget _selectField(FormFieldDef field) {
+    final initialVal = _answers[field.key]?.toString();
+    final isValidVal = (field.options ?? []).contains(initialVal) ? initialVal : null;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: DropdownButtonFormField<String>(
+        initialValue: isValidVal,
         decoration: InputDecoration(labelText: field.label + (field.required ? ' *' : '')),
         items: (field.options ?? [])
             .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
@@ -428,7 +539,7 @@ class _CollecteFormScreenState extends ConsumerState<CollecteFormScreen> {
           if (field.required && value == null) return 'Ce champ est obligatoire';
           return null;
         },
-        onChanged: (_) {},
+        onChanged: (val) => _answers[field.key] = val,
         onSaved: (value) => _answers[field.key] = value,
       ),
     );
@@ -469,6 +580,60 @@ class _CollecteFormScreenState extends ConsumerState<CollecteFormScreen> {
           }
         },
       ),
+    );
+  }
+
+  Widget _buildMissionSelector() {
+    final missionsAsync = ref.watch(myMissionsProvider);
+
+    return missionsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (error, stackTrace) => const SizedBox.shrink(),
+      data: (List<MissionSummary> missions) {
+        final activeMissions = missions.where((m) => m.status == 'ACTIVE').toList();
+
+        if (activeMissions.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: Colors.grey.shade500),
+                const SizedBox(width: 6),
+                Text(
+                  'Aucune mission active — collecte non rattachée',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: DropdownButtonFormField<int?>(
+            initialValue: _selectedMissionId,
+            decoration: const InputDecoration(
+              labelText: 'Mission (optionnel)',
+              prefixIcon: Icon(Icons.flag_outlined),
+            ),
+            items: [
+              const DropdownMenuItem<int?>(
+                value: null,
+                child: Text('Aucune mission'),
+              ),
+              ...activeMissions.map(
+                (m) => DropdownMenuItem<int?>(
+                  value: m.id,
+                  child: Text(m.name),
+                ),
+              ),
+            ],
+            onChanged: (value) {
+              setState(() => _selectedMissionId = value);
+            },
+          ),
+        );
+      },
     );
   }
 }

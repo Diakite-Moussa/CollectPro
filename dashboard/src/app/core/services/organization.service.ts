@@ -9,6 +9,7 @@ import {
 } from '../models/organization.model';
 import { environment } from '../../../environments/environment';
 
+
 @Injectable({
   providedIn: 'root'
 })
@@ -32,5 +33,11 @@ export class OrganizationService {
   updateOrganizationStatus(id: number, status: 'ACTIVE' | 'INACTIVE'): Observable<OrganizationResponse> {
     const body: UpdateOrganizationStatusRequest = { status };
     return this.http.patch<OrganizationResponse>(`${this.apiUrl}/${id}/status`, body);
+  }
+
+  uploadLogo(id: number, file: File): Observable<OrganizationResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.put<OrganizationResponse>(`${this.apiUrl}/${id}/logo`, formData);
   }
 }

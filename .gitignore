@@ -6,3 +6,4 @@ Email*.txt
 .env
 .env.local
 .env.*.local
+.idea/

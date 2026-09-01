@@ -38,4 +38,41 @@ export class CollecteService {
   rejectCollecte(id: number, comment: string): Observable<CollecteResponse> {
     return this.http.post<CollecteResponse>(`${this.apiUrl}/${id}/reject`, { comment });
   }
+
+  exportCsv(filter?: { missionId?: number; formId?: number; status?: string; startDate?: string; endDate?: string; search?: string }): Observable<Blob> {
+    let params: any = {};
+    if (filter) {
+      if (filter.missionId != null) params.missionId = filter.missionId;
+      if (filter.formId != null) params.formId = filter.formId;
+      if (filter.status) params.status = filter.status;
+      if (filter.startDate) params.startDate = filter.startDate;
+      if (filter.endDate) params.endDate = filter.endDate;
+      if (filter.search) params.search = filter.search;
+    }
+    return this.http.get(`${this.apiUrl}/export/csv`, { params, responseType: 'blob' });
+  }
+
+  exportExcel(filter?: { missionId?: number; formId?: number; status?: string; startDate?: string; endDate?: string; search?: string }): Observable<Blob> {
+    let params: any = {};
+    if (filter) {
+      if (filter.missionId != null) params.missionId = filter.missionId;
+      if (filter.formId != null) params.formId = filter.formId;
+      if (filter.status) params.status = filter.status;
+      if (filter.startDate) params.startDate = filter.startDate;
+      if (filter.endDate) params.endDate = filter.endDate;
+      if (filter.search) params.search = filter.search;
+    }
+    return this.http.get(`${this.apiUrl}/export/excel`, { params, responseType: 'blob' });
+  }
+
+  triggerBrowserDownload(blob: Blob, filename: string): void {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }
 }

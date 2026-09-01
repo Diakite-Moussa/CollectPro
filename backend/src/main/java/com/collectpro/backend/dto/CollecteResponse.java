@@ -23,6 +23,8 @@ public class CollecteResponse {
     private LocalDateTime validatedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Long missionId;
+    private Boolean outsideMissionZone;
 
     @Getter
     @Builder

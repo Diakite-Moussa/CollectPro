@@ -87,5 +87,40 @@ public class FileStorageService {
         };
     }
 
-    public record StoredFile(String originalFilename, String storedFilename, String contentType, long sizeBytes) {}
+    public record StoredFile(String originalFilename, String storedFilename, String contentType, long sizeBytes) {
+
+    }
+
+    public StoredFile saveOrganizationLogo(Long organizationId, MultipartFile file) throws IOException {
+        if (file.isEmpty()) {
+            throw new BusinessRuleException("Fichier vide");
+        }
+        String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "logo";
+        String storedName = buildOrganizationLogoFilename(organizationId, originalName);
+        Path target = resolvePath(storedName);
+        Files.createDirectories(target.getParent());
+        file.transferTo(target);
+        return new StoredFile(originalName, storedName, file.getContentType(), file.getSize());
+    }
+
+    private String buildOrganizationLogoFilename(Long organizationId, String originalFilename) {
+        String safeExt = "";
+        int dot = originalFilename.lastIndexOf('.');
+        if (dot > 0 && dot < originalFilename.length() - 1) {
+            safeExt = originalFilename.substring(dot).replaceAll("[^a-zA-Z0-9.]", "");
+        }
+        return "organizations/" + organizationId + "/logo/" + UUID.randomUUID() + safeExt;
+    }
+
+    public StoredFile saveReportBytes(Long organizationId, byte[] bytes, String fallbackName) throws IOException {
+        if (bytes == null || bytes.length == 0) {
+            throw new BusinessRuleException("Fichier rapport vide");
+        }
+        String originalName = fallbackName != null && !fallbackName.isBlank() ? fallbackName : "rapport.pdf";
+        String storedName = "organizations/" + organizationId + "/reports/" + UUID.randomUUID() + ".pdf";
+        Path target = resolvePath(storedName);
+        Files.createDirectories(target.getParent());
+        Files.write(target, bytes);
+        return new StoredFile(originalName, storedName, "application/pdf", bytes.length);
+    }
 }
