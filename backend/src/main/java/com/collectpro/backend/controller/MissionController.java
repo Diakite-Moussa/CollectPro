@@ -17,6 +17,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 
 import java.util.List;
 
@@ -49,6 +53,21 @@ public class MissionController {
             return ResponseEntity.ok(missionService.getAllMissions());
         }
         return ResponseEntity.ok(missionService.getMissionsForOrganization(user.getOrganization()));
+    }
+
+
+    /**
+     * Fix #12 — pagination serveur. Endpoint dédié au dashboard (jamais
+     * appelé par l'app mobile) : GET /missions reste inchangé pour préserver
+     * le contrat consommé par mission_service.dart côté agent terrain.
+     * Paramètres : ?page=0&size=25
+     */
+    @GetMapping("/list")
+    @PreAuthorize("@securityAuth.hasPermission(authentication, 'VIEW_MISSION')")
+    public ResponseEntity<Page<MissionResponse>> getMissionsPaged(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @PageableDefault(size = 25, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(missionService.getMissionsPaged(principal.getUser(), pageable));
     }
 
     @GetMapping("/progress")

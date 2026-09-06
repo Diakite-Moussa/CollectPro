@@ -34,6 +34,10 @@ public class SecurityConfig {
     @Value("${app.cors.allowed-origins}")
     private List<String> allowedOrigins;
 
+
+
+    private final RateLimitingFilter rateLimitingFilter;   // <-- ajouter cette ligne
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -72,7 +76,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/login", "/refresh", "/forgot-password", "/reset-password").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/login", "/refresh", "/logout", "/forgot-password", "/reset-password").permitAll()
                         .requestMatchers(HttpMethod.GET, "/activate").permitAll()
                         .requestMatchers(HttpMethod.POST, "/activate").permitAll()
                         .requestMatchers(HttpMethod.GET, "/files/organizations/*/logo").permitAll()
@@ -83,6 +87,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/collectes").hasRole("AGENT")
                         .anyRequest().authenticated())
                 .authenticationProvider(authenticationProvider())
+                .addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

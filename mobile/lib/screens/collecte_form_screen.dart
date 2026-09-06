@@ -31,6 +31,7 @@ class CollecteFormScreen extends ConsumerStatefulWidget {
   final double? initialLongitude;
   final List<String>? initialPhotoPaths;
   final List<String>? initialDocumentPaths;
+  final int? initialMissionId;
   final bool isResubmit;
 
   const CollecteFormScreen({
@@ -45,6 +46,7 @@ class CollecteFormScreen extends ConsumerStatefulWidget {
     this.initialLongitude,
     this.initialPhotoPaths,
     this.initialDocumentPaths,
+    this.initialMissionId,
     this.isResubmit = false,
   });
 
@@ -77,6 +79,10 @@ class _CollecteFormScreenState extends ConsumerState<CollecteFormScreen> {
   void initState() {
     super.initState();
     _schema = FormSchema.fromJsonString(widget.schemaJson);
+
+    if (widget.initialMissionId != null) {
+      _selectedMissionId = widget.initialMissionId;
+    }
 
     if (widget.initialAnswers != null) {
       _answers.addAll(widget.initialAnswers!);

@@ -7,6 +7,7 @@ import com.collectpro.backend.entity.Organization;
 import com.collectpro.backend.entity.RefreshToken;
 import com.collectpro.backend.entity.Role;
 import com.collectpro.backend.entity.User;
+import com.collectpro.backend.enums.OrganizationStatus;
 import com.collectpro.backend.enums.RoleType;
 import com.collectpro.backend.enums.UserStatus;
 import com.collectpro.backend.exception.BusinessRuleException;
@@ -67,7 +68,11 @@ class AuthServiceTest {
         ReflectionTestUtils.setField(authService, "jwtExpiration", 86400000L);
         ReflectionTestUtils.setField(authService, "refreshTokenExpirationDays", 30L);
 
-        testOrg = Organization.builder().id(1L).name("Test Org").build();
+        testOrg = Organization.builder()
+                .id(1L)
+                .name("Test Org")
+                .status(OrganizationStatus.ACTIVE)
+                .build();
         agentRole = Role.builder().id(1L).name(RoleType.AGENT).build();
 
         activeUser = User.builder()
@@ -216,5 +221,65 @@ class AuthServiceTest {
         assertEquals("new_raw_refresh", response.getRefreshToken());
         assertNotNull(storedToken.getRevokedAt());
         verify(refreshTokenRepository, times(2)).save(any(RefreshToken.class));
+    }
+
+    @Test
+    @DisplayName("login() - Échec : organisation désactivée")
+    void login_InactiveOrganization_ThrowsException() {
+        Organization inactiveOrg = Organization.builder()
+                .id(2L)
+                .name("Inactive Org")
+                .status(OrganizationStatus.INACTIVE)
+                .build();
+        User userWithInactiveOrg = User.builder()
+                .id(12L)
+                .email("user.inactive@test.com")
+                .password("encoded_pass")
+                .status(UserStatus.ACTIVE)
+                .role(agentRole)
+                .organization(inactiveOrg)
+                .build();
+
+        LoginRequest request = new LoginRequest();
+        request.setEmail("user.inactive@test.com");
+        request.setPassword("password123");
+
+        when(userRepository.findByEmail("user.inactive@test.com")).thenReturn(Optional.of(userWithInactiveOrg));
+
+        BusinessRuleException exception = assertThrows(BusinessRuleException.class, () -> authService.login(request, null));
+        assertEquals("L'organisation de ce compte est désactivée", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("refresh() - Échec : organisation désactivée lors du refresh")
+    void refresh_InactiveOrganization_ThrowsException() {
+        Organization inactiveOrg = Organization.builder()
+                .id(2L)
+                .name("Inactive Org")
+                .status(OrganizationStatus.INACTIVE)
+                .build();
+        User userWithInactiveOrg = User.builder()
+                .id(12L)
+                .email("user.inactive@test.com")
+                .status(UserStatus.ACTIVE)
+                .role(agentRole)
+                .organization(inactiveOrg)
+                .build();
+
+        RefreshTokenRequest request = new RefreshTokenRequest();
+        request.setRefreshToken("raw_refresh_inactive");
+
+        RefreshToken storedToken = RefreshToken.builder()
+                .id(101L)
+                .user(userWithInactiveOrg)
+                .tokenHash("hash_inactive")
+                .expiresAt(LocalDateTime.now().plusDays(5))
+                .build();
+
+        when(tokenUtil.hashToken("raw_refresh_inactive")).thenReturn("hash_inactive");
+        when(refreshTokenRepository.findByTokenHash("hash_inactive")).thenReturn(Optional.of(storedToken));
+
+        BusinessRuleException exception = assertThrows(BusinessRuleException.class, () -> authService.refresh(request, null));
+        assertEquals("L'organisation de ce compte est désactivée", exception.getMessage());
     }
 }

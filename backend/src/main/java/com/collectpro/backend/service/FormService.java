@@ -7,7 +7,9 @@ import com.collectpro.backend.entity.Organization;
 import com.collectpro.backend.entity.User;
 import com.collectpro.backend.enums.AuditAction;
 import com.collectpro.backend.enums.FormStatus;
+import com.collectpro.backend.enums.RoleType;
 import com.collectpro.backend.exception.BusinessRuleException;
+import com.collectpro.backend.exception.ForbiddenOperationException;
 import com.collectpro.backend.exception.ResourceNotFoundException;
 import com.collectpro.backend.repository.FormRepository;
 import com.collectpro.backend.repository.FormVersionRepository;
@@ -63,6 +65,7 @@ public class FormService {
     @Transactional
     public FormResponse publishForm(User actor, Long formId) {
         Form form = getFormEntity(formId);
+        assertSameOrganization(form, actor);
 
         if (form.getStatus() == FormStatus.ARCHIVED) {
             throw new BusinessRuleException("Un formulaire archivé ne peut pas être publié");
@@ -87,11 +90,41 @@ public class FormService {
     }
 
     @Transactional
-    public FormResponse archiveForm(Long formId) {
+    public FormResponse archiveForm(User actor, Long formId) {
         Form form = getFormEntity(formId);
+        assertSameOrganization(form, actor);
+
         form.setStatus(FormStatus.ARCHIVED);
         form = formRepository.save(form);
+
+        auditLogService.log(
+                actor,
+                form.getOrganization(),
+                AuditAction.FORM_ARCHIVED,
+                "Form",
+                form.getId(),
+                "Archivage du formulaire '" + form.getName() + "'"
+        );
+
         return toResponse(form);
+    }
+
+    /**
+     * Vérifie que le formulaire appartient à l'organisation de l'acteur.
+     * Le Super Admin, qui n'a pas d'organisation, n'est jamais restreint.
+     * Sans ce contrôle, un Admin d'une organisation pouvait publier/archiver/
+     * versionner le formulaire d'une AUTRE organisation en devinant son id
+     * (IDOR — faille corrigée le 02/09/2026).
+     */
+    public void assertSameOrganization(Form form, User actor) {
+        if (actor.getRole().getName() == RoleType.SUPER_ADMIN) {
+            return;
+        }
+        if (actor.getOrganization() == null
+                || form.getOrganization() == null
+                || !actor.getOrganization().getId().equals(form.getOrganization().getId())) {
+            throw new ForbiddenOperationException("Ce formulaire n'appartient pas à votre organisation");
+        }
     }
 
     private FormResponse toResponse(Form form) {

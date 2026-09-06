@@ -27,6 +27,10 @@ public class CustomUserDetailsService implements UserDetailsService {
         // la vue (open-in-view), donc sans ça, getAuthorities() plantait avec
         // une LazyInitializationException.
         Hibernate.initialize(user.getRole());
+        // Idem pour l'organisation : CustomUserDetails.isEnabled()/isAccountNonLocked()
+        // lisent user.getOrganization().getStatus() dans JwtAuthenticationFilter,
+        // hors de toute session Hibernate ouverte sans ce chargement anticipé.
+        Hibernate.initialize(user.getOrganization());
         return new CustomUserDetails(user);
     }
 }

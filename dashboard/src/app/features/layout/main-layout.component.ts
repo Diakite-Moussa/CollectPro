@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatListModule } from '@angular/material/list';
@@ -177,7 +177,6 @@ import { ROUTE_ROLES } from '../../core/constants/route-roles';
 })
 export class MainLayoutComponent {
   private authService = inject(AuthService);
-  private router = inject(Router);
   user = this.authService.currentUser;
 
   canAccess(routeKey: string): boolean {
@@ -189,6 +188,5 @@ export class MainLayoutComponent {
 
   onLogout(): void {
     this.authService.logout();
-    this.router.navigate(['/login']);
   }
 }

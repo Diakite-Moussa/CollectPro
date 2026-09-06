@@ -27,6 +27,8 @@ import com.collectpro.backend.repository.projection.MissionProgressProjection;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Map;
@@ -136,10 +138,18 @@ public class MissionService {
         return toResponse(mission);
     }
 
+    private void assertMissionAssignable(Mission mission) {
+        if (mission.getStatus() == MissionStatus.COMPLETED || mission.getStatus() == MissionStatus.CANCELLED) {
+            throw new BusinessRuleException(
+                    "Impossible de modifier les assignations d'une mission " + mission.getStatus());
+        }
+    }
+
     @Transactional
     public MissionResponse assignAgents(Long missionId, AssignAgentsToMissionRequest request, User actor) {
         Mission mission = getMissionEntity(missionId);
         assertSameOrganization(mission, actor);
+        assertMissionAssignable(mission);
 
         for (Long agentId : request.getAgentIds()) {
             if (missionAgentRepository.existsByMissionIdAndAgentId(missionId, agentId)) {
@@ -181,6 +191,7 @@ public class MissionService {
     public MissionResponse unassignAgent(Long missionId, Long agentId, User actor) {
         Mission mission = getMissionEntity(missionId);
         assertSameOrganization(mission, actor);
+        assertMissionAssignable(mission);
 
         if (!missionAgentRepository.existsByMissionIdAndAgentId(missionId, agentId)) {
             throw new ResourceNotFoundException("Cet agent n'est pas assigné à cette mission");
@@ -203,6 +214,7 @@ public class MissionService {
     public MissionResponse assignForms(Long missionId, AssignFormsToMissionRequest request, User actor) {
         Mission mission = getMissionEntity(missionId);
         assertSameOrganization(mission, actor);
+        assertMissionAssignable(mission);
 
         for (Long formId : request.getFormIds()) {
             Form form = formRepository.findById(formId)
@@ -254,6 +266,36 @@ public class MissionService {
                 .map(MissionAgent::getMission)
                 .map(this::toResponse)
                 .toList();
+    }
+
+
+    /**
+     * Fix #12 — pagination serveur, nouvel endpoint dédié dashboard
+     * (GET /missions/list). N'est jamais appelé par l'app mobile,
+     * donc pas de contrainte de compatibilité de format de réponse.
+     * Réutilise la même logique de visibilité par rôle que getMissions().
+     */
+    @Transactional(readOnly = true)
+    public Page<MissionResponse> getMissionsPaged(User actor, Pageable pageable) {
+        RoleType role = actor.getRole().getName();
+        Page<Mission> page;
+        if (role == RoleType.SUPER_ADMIN) {
+            page = missionRepository.findAll(pageable);
+        } else if (role == RoleType.AGENT) {
+            // Cas rare (l'agent utilise normalement le mobile / GET /missions),
+            // mais on couvre le cas où le dashboard serait consulté par un agent.
+            List<Mission> assigned = missionAgentRepository.findByAgentId(actor.getId()).stream()
+                    .map(MissionAgent::getMission)
+                    .toList();
+            page = new org.springframework.data.domain.PageImpl<>(assigned, pageable, assigned.size());
+        } else {
+            if (actor.getOrganization() == null) {
+                page = Page.empty(pageable);
+            } else {
+                page = missionRepository.findByOrganization(actor.getOrganization(), pageable);
+            }
+        }
+        return page.map(this::toResponse);
     }
 
     @Transactional(readOnly = true)

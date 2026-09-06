@@ -9,6 +9,8 @@ import com.collectpro.backend.repository.projection.MissionProgressProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,6 +25,16 @@ public interface CollecteRepository extends JpaRepository<Collecte, Long> {
     List<Collecte> findByAgent_OrganizationIdAndMissionId(Long organizationId, Long missionId);
     List<Collecte> findByMissionId(Long missionId);
     List<Collecte> findByMissionIdAndCreatedAtBetween(Long missionId, LocalDateTime start, LocalDateTime end);
+
+    // Fix #12 — pagination serveur (endpoints admin/superviseur uniquement,
+    // /collectes/mine reste non paginé — contrat consommé par l'app mobile)
+    Page<Collecte> findByAgentIn(List<User> agents, Pageable pageable);
+    Page<Collecte> findByAgentInAndMissionId(List<User> agents, Long missionId, Pageable pageable);
+    Page<Collecte> findByAgentInAndStatus(List<User> agents, CollecteStatus status, Pageable pageable);
+    Page<Collecte> findByAgent_OrganizationId(Long organizationId, Pageable pageable);
+    Page<Collecte> findByAgent_OrganizationIdAndMissionId(Long organizationId, Long missionId, Pageable pageable);
+    Page<Collecte> findByMissionId(Long missionId, Pageable pageable);
+    // Page<Collecte> findAll(Pageable pageable) est déjà héritée de JpaRepository
 
     long countByAgent_OrganizationId(Long organizationId);
     long countByAgent_OrganizationIdAndStatus(Long organizationId, CollecteStatus status);

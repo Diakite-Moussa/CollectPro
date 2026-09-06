@@ -1,6 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, tap, catchError, throwError, switchMap, shareReplay } from 'rxjs';
+import { Router } from '@angular/router';
+import { Observable, of, tap, catchError, throwError, shareReplay } from 'rxjs';
 import { AuthResponse, LoginRequest, UserSummary } from '../models/auth.model';
 import { environment } from '../../../environments/environment';
 
@@ -9,19 +10,27 @@ import { environment } from '../../../environments/environment';
 })
 export class AuthService {
   private readonly apiUrl = environment.apiUrl;
-  private readonly tokenKey = 'collectpro_access_token';
-  private readonly refreshTokenKey = 'collectpro_refresh_token';
   private readonly userKey = 'collectpro_user';
+  private accessTokenInMemory: string | null = null;
 
   currentUser = signal<UserSummary | null>(null);
   private refreshInFlight: Observable<AuthResponse> | null = null;
 
-  constructor(private http: HttpClient) {
+  constructor(private http: HttpClient, private router: Router) {
     this.currentUser.set(this.getStoredUser());
   }
 
+  initSession(): Observable<AuthResponse | null> {
+    if (this.getStoredUser()) {
+      return this.refreshToken().pipe(
+        catchError(() => of(null))
+      );
+    }
+    return of(null);
+  }
+
   login(request: LoginRequest): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.apiUrl}/login`, request).pipe(
+    return this.http.post<AuthResponse>(`${this.apiUrl}/login`, request, { withCredentials: true }).pipe(
       tap((res) => this.setSession(res))
     );
   }
@@ -39,13 +48,9 @@ export class AuthService {
   }
 
   refreshToken(): Observable<AuthResponse> {
-    const storedRefresh = this.getRefreshToken();
-    if (!storedRefresh) {
-      return throwError(() => new Error('No refresh token'));
-    }
     if (!this.refreshInFlight) {
       this.refreshInFlight = this.http
-        .post<AuthResponse>(`${this.apiUrl}/refresh`, { refreshToken: storedRefresh })
+        .post<AuthResponse>(`${this.apiUrl}/refresh`, {}, { withCredentials: true })
         .pipe(
           tap((res) => this.setSession(res)),
           catchError((err) => {
@@ -62,44 +67,32 @@ export class AuthService {
     return this.refreshInFlight;
   }
 
-  logout(): void {
+  logout(redirectToLogin: boolean = true): void {
+    this.http.post(`${this.apiUrl}/logout`, {}, { withCredentials: true }).subscribe({ error: () => {} });
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.removeItem(this.tokenKey);
-        localStorage.removeItem(this.refreshTokenKey);
         localStorage.removeItem(this.userKey);
       }
     } catch { }
+    this.accessTokenInMemory = null;
     this.currentUser.set(null);
+    if (redirectToLogin) {
+      this.router.navigate(['/login']);
+    }
   }
 
   getToken(): string | null {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        return localStorage.getItem(this.tokenKey);
-      }
-    } catch { }
-    return null;
-  }
-
-  getRefreshToken(): string | null {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        return localStorage.getItem(this.refreshTokenKey);
-      }
-    } catch { }
-    return null;
+    return this.accessTokenInMemory;
   }
 
   isAuthenticated(): boolean {
-    return !!this.getToken() || !!this.getRefreshToken();
+    return !!this.accessTokenInMemory || !!this.getStoredUser();
   }
 
   private setSession(authResult: AuthResponse): void {
+    this.accessTokenInMemory = authResult.accessToken;
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.setItem(this.tokenKey, authResult.accessToken);
-        localStorage.setItem(this.refreshTokenKey, authResult.refreshToken);
         localStorage.setItem(this.userKey, JSON.stringify(authResult.user));
       }
     } catch { }

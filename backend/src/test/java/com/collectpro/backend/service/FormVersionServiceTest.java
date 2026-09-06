@@ -86,6 +86,32 @@ class FormVersionServiceTest {
     }
 
     @Test
+    @DisplayName("createVersion - Délègue le contrôle d'organisation à FormService (non-régression IDOR)")
+    void createVersion_DelegatesOrganizationCheck() {
+        CreateFormVersionRequest request = new CreateFormVersionRequest();
+        request.setSchemaJson("{\"fields\":[]}");
+
+        when(formService.getFormEntity(50L)).thenReturn(form);
+        doThrow(new com.collectpro.backend.exception.ForbiddenOperationException("Ce formulaire n'appartient pas à votre organisation"))
+                .when(formService).assertSameOrganization(form, creator);
+
+        assertThrows(com.collectpro.backend.exception.ForbiddenOperationException.class,
+                () -> formVersionService.createVersion(50L, request, creator));
+        verify(formVersionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("getVersionsForForm - Délègue le contrôle d'organisation à FormService (non-régression IDOR)")
+    void getVersionsForForm_DelegatesOrganizationCheck() {
+        when(formService.getFormEntity(50L)).thenReturn(form);
+        doThrow(new com.collectpro.backend.exception.ForbiddenOperationException("Ce formulaire n'appartient pas à votre organisation"))
+                .when(formService).assertSameOrganization(form, creator);
+
+        assertThrows(com.collectpro.backend.exception.ForbiddenOperationException.class,
+                () -> formVersionService.getVersionsForForm(50L, creator));
+    }
+
+    @Test
     @DisplayName("getVersionsForForm - Retourne les versions du formulaire")
     void getVersionsForForm_ReturnsList() {
         FormVersion v1 = FormVersion.builder().id(1L).form(form).versionNumber(1).createdBy(creator).build();
@@ -94,7 +120,7 @@ class FormVersionServiceTest {
         when(formService.getFormEntity(50L)).thenReturn(form);
         when(formVersionRepository.findByFormOrderByVersionNumberDesc(form)).thenReturn(List.of(v2, v1));
 
-        List<FormVersionResponse> result = formVersionService.getVersionsForForm(50L);
+        List<FormVersionResponse> result = formVersionService.getVersionsForForm(50L, creator);
 
         assertEquals(2, result.size());
         assertEquals(2, result.get(0).getVersionNumber());

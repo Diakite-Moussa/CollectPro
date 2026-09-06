@@ -5,6 +5,7 @@ import com.collectpro.backend.entity.ActivationToken;
 import com.collectpro.backend.entity.RefreshToken;
 import com.collectpro.backend.entity.User;
 import com.collectpro.backend.enums.AuditAction;
+import com.collectpro.backend.enums.OrganizationStatus;
 import com.collectpro.backend.enums.RoleType;
 import com.collectpro.backend.enums.UserStatus;
 import com.collectpro.backend.exception.BusinessRuleException;
@@ -56,6 +57,15 @@ public class AuthService {
             RoleType.SUPER_ADMIN, RoleType.ADMIN_PRINCIPAL, RoleType.ADMIN_SECONDAIRE);
     private static final Set<RoleType> MOBILE_ONLY_ROLES = Set.of(RoleType.AGENT);
     // SUPERVISOR : acces autorise sur les deux plateformes, aucune restriction.
+
+    private void assertUserAndOrganizationActive(User user) {
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new BusinessRuleException("Ce compte n'est pas actif");
+        }
+        if (user.getOrganization() != null && user.getOrganization().getStatus() != OrganizationStatus.ACTIVE) {
+            throw new BusinessRuleException("L'organisation de ce compte est désactivée");
+        }
+    }
 
     /**
      * Restreint la connexion selon le role de l'utilisateur et la plateforme
@@ -145,9 +155,7 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new InvalidCredentialsException("Email ou mot de passe incorrect"));
 
-        if (user.getStatus() != UserStatus.ACTIVE) {
-            throw new BusinessRuleException("Ce compte n'est pas actif");
-        }
+        assertUserAndOrganizationActive(user);
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new InvalidCredentialsException("Email ou mot de passe incorrect");
@@ -170,6 +178,8 @@ public class AuthService {
             throw new InvalidCredentialsException("Refresh token expiré ou révoqué");
         }
 
+        assertUserAndOrganizationActive(refreshToken.getUser());
+
         enforcePlatformAccess(refreshToken.getUser(), clientPlatform);
 
         // Rotation : on révoque l'ancien refresh token
@@ -177,6 +187,15 @@ public class AuthService {
         refreshTokenRepository.save(refreshToken);
 
         return buildAuthResponse(refreshToken.getUser());
+    }
+
+    @Transactional
+    public void revokeRefreshToken(String rawToken) {
+        String tokenHash = tokenUtil.hashToken(rawToken);
+        refreshTokenRepository.findByTokenHash(tokenHash).ifPresent(rt -> {
+            rt.setRevokedAt(LocalDateTime.now());
+            refreshTokenRepository.save(rt);
+        });
     }
 
     @Transactional

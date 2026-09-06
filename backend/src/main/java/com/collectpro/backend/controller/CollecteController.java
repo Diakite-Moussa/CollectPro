@@ -17,6 +17,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 
 import java.util.List;
 
@@ -55,27 +59,39 @@ public class CollecteController {
         return ResponseEntity.ok(collecteService.getCollectesForAgent(principal.getUser()));
     }
 
+    /**
+     * Fix #12 — pagination serveur. Paramètres : ?page=0&size=25&missionId=...
+     */
     @GetMapping("/team")
     @PreAuthorize("@securityAuth.hasRole(authentication, 'SUPERVISOR')")
-    public ResponseEntity<List<CollecteResponse>> getTeamCollectes(
+    public ResponseEntity<Page<CollecteResponse>> getTeamCollectes(
             @AuthenticationPrincipal CustomUserDetails principal,
-            @RequestParam(required = false) Long missionId) {
-        return ResponseEntity.ok(collecteService.getCollectesForSupervisor(principal.getUser(), missionId));
+            @RequestParam(required = false) Long missionId,
+            @PageableDefault(size = 25, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(collecteService.getCollectesForSupervisor(principal.getUser(), missionId, pageable));
     }
 
+    /**
+     * Fix #12 — pagination serveur.
+     */
     @GetMapping("/team/pending-validation")
     @PreAuthorize("@securityAuth.hasRole(authentication, 'SUPERVISOR')")
-    public ResponseEntity<List<CollecteResponse>> getPendingValidation(
-            @AuthenticationPrincipal CustomUserDetails principal) {
-        return ResponseEntity.ok(collecteService.getPendingValidationForSupervisor(principal.getUser()));
+    public ResponseEntity<Page<CollecteResponse>> getPendingValidation(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @PageableDefault(size = 25, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(collecteService.getPendingValidationForSupervisor(principal.getUser(), pageable));
     }
 
+    /**
+     * Fix #12 — pagination serveur. Paramètres : ?page=0&size=25&missionId=...
+     */
     @GetMapping("/organization")
     @PreAuthorize("@securityAuth.hasAnyRole(authentication, 'ADMIN_PRINCIPAL', 'ADMIN_SECONDAIRE', 'SUPER_ADMIN')")
-    public ResponseEntity<List<CollecteResponse>> getOrganizationCollectes(
+    public ResponseEntity<Page<CollecteResponse>> getOrganizationCollectes(
             @AuthenticationPrincipal CustomUserDetails principal,
-            @RequestParam(required = false) Long missionId) {
-        return ResponseEntity.ok(collecteService.getCollectesForAdmin(principal.getUser(), missionId));
+            @RequestParam(required = false) Long missionId,
+            @PageableDefault(size = 25, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(collecteService.getCollectesForAdmin(principal.getUser(), missionId, pageable));
     }
 
     @PostMapping("/{id}/validate")

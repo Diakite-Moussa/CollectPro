@@ -49,6 +49,9 @@ app:
   refresh-token:
     expiration-days: 30
 
+  cookie:
+    secure: ${COOKIE_SECURE:false}
+
   frontend-url: ${FRONTEND_URL:http://localhost:4200}
 
   mail:

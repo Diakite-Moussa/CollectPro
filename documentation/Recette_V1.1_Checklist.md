@@ -14,16 +14,16 @@ validation).
 
 ## Phase 0 — Préparation
 
-- [ ] Se connecter en SUPER_ADMIN, créer une organisation de test avec un logo (upload) → vérifier qu'il s'affiche bien
-- [ ] Créer/vérifier qu'il existe : 1 ADMIN_PRINCIPAL, 1 SUPERVISEUR, 2-3 AGENTS, 1 formulaire publié dans cette organisation
-- [ ] Affecter les agents au superviseur
+- [*] Se connecter en SUPER_ADMIN, créer une organisation de test avec un logo (upload) → vérifier qu'il s'affiche bien
+- [*] Créer/vérifier qu'il existe : 1 ADMIN_PRINCIPAL, 1 SUPERVISEUR, 2-3 AGENTS, 1 formulaire publié dans cette organisation
+- [*] Affecter les agents au superviseur
 
 ## Phase 1 — Mission avec zone GPS (Sprint 3)
 
-- [ ] Créer une mission avec : nom, formulaire(s) rattaché(s), zone GPS (lat/lng/rayon réaliste, ex. 500 m), objectif de collectes (`expectedCollectesCount`)
-- [ ] Vérifier que la mission apparaît en statut `DRAFT`, puis la passer en `ACTIVE`
-- [ ] Affecter 2-3 agents à la mission
-- [ ] Vérifier qu'une collecte **ne peut pas** être créée sur une mission `DRAFT`/`CANCELLED`/`COMPLETED` (rejet avec message explicite)
+- [*] Créer une mission avec : nom, formulaire(s) rattaché(s), zone GPS (lat/lng/rayon réaliste, ex. 500 m), objectif de collectes (`expectedCollectesCount`)
+- [*] Vérifier que la mission apparaît en statut `DRAFT`, puis la passer en `ACTIVE`
+- [*] Affecter 2-3 agents à la mission
+- [*] Vérifier qu'une collecte **ne peut pas** être créée sur une mission `DRAFT`/`CANCELLED`/`COMPLETED` (rejet avec message explicite)
 
 ## Phase 2 — Collectes terrain (dans et hors zone)
 

@@ -1,6 +1,7 @@
 package com.collectpro.backend.security;
 
 import com.collectpro.backend.entity.User;
+import com.collectpro.backend.enums.OrganizationStatus;
 import com.collectpro.backend.enums.UserStatus;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -43,7 +44,10 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return user.getStatus() != UserStatus.DISABLED;
+        boolean isUserNonLocked = user.getStatus() != UserStatus.DISABLED;
+        boolean isOrgNonDisabled = user.getOrganization() == null
+                || user.getOrganization().getStatus() != OrganizationStatus.INACTIVE;
+        return isUserNonLocked && isOrgNonDisabled;
     }
 
     @Override
@@ -53,6 +57,9 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return user.getStatus() == UserStatus.ACTIVE;
+        boolean isUserActive = user.getStatus() == UserStatus.ACTIVE;
+        boolean isOrgActive = user.getOrganization() == null
+                || user.getOrganization().getStatus() == OrganizationStatus.ACTIVE;
+        return isUserActive && isOrgActive;
     }
 }

@@ -488,8 +488,8 @@ export class DashboardHomeComponent implements OnInit {
       : this.collecteService.getOrganizationCollectes();
 
     collectes$.subscribe({
-      next: (collectes) => {
-        this.recentCollectes = collectes.slice(0, 5);
+      next: (page) => {
+        this.recentCollectes = page.content.slice(0, 5);
       },
       error: () => { }
     });

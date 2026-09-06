@@ -35,6 +35,8 @@ import com.collectpro.backend.entity.Mission;
 import com.collectpro.backend.enums.MissionStatus;
 import com.collectpro.backend.repository.MissionRepository;
 import com.collectpro.backend.util.GeoUtils;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 
 import java.nio.file.Path;
@@ -135,45 +137,52 @@ public class CollecteService {
                 .toList();
     }
 
-    public List<CollecteResponse> getCollectesForSupervisor(User supervisor, Long missionId) {
+    /**
+     * Fix #12 — pagination serveur.
+     */
+    public Page<CollecteResponse> getCollectesForSupervisor(User supervisor, Long missionId, Pageable pageable) {
         List<User> agents = supervisorAgentRepository.findBySupervisorId(supervisor.getId()).stream()
                 .map(SupervisorAgent::getAgent)
                 .toList();
-        List<Collecte> collectes = (missionId != null)
-                ? collecteRepository.findByAgentInAndMissionId(agents, missionId)
-                : collecteRepository.findByAgentIn(agents);
-        return collectes.stream()
-                .map(this::toResponse)
-                .toList();
+        Page<Collecte> page = (missionId != null)
+                ? collecteRepository.findByAgentInAndMissionId(agents, missionId, pageable)
+                : collecteRepository.findByAgentIn(agents, pageable);
+        return page.map(this::toResponse);
     }
 
-    public List<CollecteResponse> getPendingValidationForSupervisor(User supervisor) {
+    /**
+     * Fix #12 — pagination serveur.
+     */
+    public Page<CollecteResponse> getPendingValidationForSupervisor(User supervisor, Pageable pageable) {
         List<User> agents = supervisorAgentRepository.findBySupervisorId(supervisor.getId()).stream()
                 .map(SupervisorAgent::getAgent)
                 .toList();
-        return collecteRepository.findByAgentInAndStatus(agents, CollecteStatus.PENDING_VALIDATION).stream()
-                .map(this::toResponse)
-                .toList();
+        return collecteRepository.findByAgentInAndStatus(agents, CollecteStatus.PENDING_VALIDATION, pageable)
+                .map(this::toResponse);
     }
 
-    public List<CollecteResponse> getCollectesForAdmin(User admin, Long missionId) {
+
+    /**
+     * Fix #12 — pagination serveur.
+     */
+    public Page<CollecteResponse> getCollectesForAdmin(User admin, Long missionId, Pageable pageable) {
         User managedAdmin = userRepository.findById(admin.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
-        List<Collecte> collectes;
+        Page<Collecte> page;
         if (managedAdmin.getRole().getName() == RoleType.SUPER_ADMIN) {
-            collectes = (missionId != null)
-                    ? collecteRepository.findByMissionId(missionId)
-                    : collecteRepository.findAll();
+            page = (missionId != null)
+                    ? collecteRepository.findByMissionId(missionId, pageable)
+                    : collecteRepository.findAll(pageable);
         } else {
             if (managedAdmin.getOrganization() == null) {
                 throw new BusinessRuleException("Utilisateur sans organisation");
             }
-            collectes = (missionId != null)
-                    ? collecteRepository.findByAgent_OrganizationIdAndMissionId(managedAdmin.getOrganization().getId(), missionId)
-                    : collecteRepository.findByAgent_OrganizationId(managedAdmin.getOrganization().getId());
+            page = (missionId != null)
+                    ? collecteRepository.findByAgent_OrganizationIdAndMissionId(managedAdmin.getOrganization().getId(), missionId, pageable)
+                    : collecteRepository.findByAgent_OrganizationId(managedAdmin.getOrganization().getId(), pageable);
         }
-        return collectes.stream().map(this::toResponse).toList();
+        return page.map(this::toResponse);
     }
     @Transactional
     public CollecteResponse validateCollecte(Long collecteId, User supervisor, ValidateCollecteRequest request) {

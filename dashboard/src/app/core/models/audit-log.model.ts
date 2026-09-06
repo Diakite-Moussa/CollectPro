@@ -14,3 +14,14 @@ export interface AuditLogResponse {
   createdAt: string;
   actor?: ActorSummary;
 }
+
+/** Fix #12 — représente la réponse paginée retournée par Spring Page<AuditLogResponse>. */
+export interface AuditLogPage {
+  content: AuditLogResponse[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+  first: boolean;
+  last: boolean;
+}

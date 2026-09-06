@@ -41,3 +41,14 @@ export interface ChangePasswordRequest {
 export interface UpdateUserStatusRequest {
   status: 'ACTIVE' | 'DISABLED';
 }
+
+/** Fix #12 — représente la réponse paginée retournée par Spring Page<UserResponse>. */
+export interface UserResponsePage {
+  content: UserResponse[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+  first: boolean;
+  last: boolean;
+}

@@ -1,3 +1,5 @@
+import { AppRole } from '../constants/route-roles';
+
 export interface LoginRequest {
   email: string;
   password: string;
@@ -8,7 +10,7 @@ export interface UserSummary {
   email: string;
   firstName: string;
   lastName: string;
-  role: string;
+  role: AppRole;
   organizationId?: number;
   organizationName?: string;
 }

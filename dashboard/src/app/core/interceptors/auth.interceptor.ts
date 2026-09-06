@@ -10,10 +10,13 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     req.url.includes('/activate');
 
   const token = authService.getToken();
-  const withPlatformHeader = req.clone({ setHeaders: { 'X-Client-Platform': 'WEB' } });
-  const authReq = token && !isAuthRoute
-    ? withPlatformHeader.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
-    : withPlatformHeader;
+  const authReq = req.clone({
+    withCredentials: true,
+    setHeaders: {
+      'X-Client-Platform': 'WEB',
+      ...(token && !isAuthRoute ? { Authorization: `Bearer ${token}` } : {})
+    }
+  });
 
   return next(authReq).pipe(
     catchError((error: HttpErrorResponse) => {
@@ -28,8 +31,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         switchMap(() => {
           const newToken = authService.getToken();
           const retryReq = req.clone({
+            withCredentials: true,
             setHeaders: {
-              Authorization: `Bearer ${newToken}`,
+              'X-Client-Platform': 'WEB',
+              ...(newToken ? { Authorization: `Bearer ${newToken}` } : {}),
               'X-Retry-After-Refresh': 'true'
             }
           });

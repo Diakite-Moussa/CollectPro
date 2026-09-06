@@ -54,7 +54,9 @@ public class FormController {
 
     @PostMapping("/{id}/archive")
     @PreAuthorize("@securityAuth.hasPermission(authentication, 'PUBLISH_FORM')")
-    public ResponseEntity<FormResponse> archiveForm(@PathVariable Long id) {
-        return ResponseEntity.ok(formService.archiveForm(id));
+    public ResponseEntity<FormResponse> archiveForm(
+            @AuthenticationPrincipal CustomUserDetails principal,
+            @PathVariable Long id) {
+        return ResponseEntity.ok(formService.archiveForm(principal.getUser(), id));
     }
 }

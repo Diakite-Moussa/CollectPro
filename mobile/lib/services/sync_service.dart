@@ -1,3 +1,4 @@
+import 'app_logger.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
@@ -23,14 +24,26 @@ class SyncService {
   final ApiClient _apiClient;
   final CollecteDao _collecteDao;
 
+  // Constantes de retry & backoff
+  static const int defaultMaxRetries = 3;
+  static const Duration defaultInitialDelay = Duration(seconds: 1);
+  static const double defaultBackoffMultiplier = 2.0;
+  static const Duration defaultMaxDelay = Duration(seconds: 8);
+
   SyncService({
     required ApiClient apiClient,
     required CollecteDao collecteDao,
   })  : _apiClient = apiClient,
         _collecteDao = collecteDao;
 
-  /// Synchronise les collectes PENDING_SYNC via multipart (fichiers séparés du JSON).
-  Future<SyncResult> syncPendingCollectes() async {
+  /// Synchronise les collectes PENDING_SYNC via multipart (fichiers séparés du JSON)
+  /// avec gestion de retry et backoff exponentiel sur les erreurs transitoires.
+  Future<SyncResult> syncPendingCollectes({
+    int maxRetries = defaultMaxRetries,
+    Duration initialDelay = defaultInitialDelay,
+    double backoffMultiplier = defaultBackoffMultiplier,
+    Duration maxDelay = defaultMaxDelay,
+  }) async {
     final pendingList = await _collecteDao.getPendingSync();
     if (pendingList.isEmpty) {
       return SyncResult(
@@ -49,35 +62,12 @@ class SyncService {
       try {
         await _collecteDao.markAsSyncing(collecte.id);
 
-        Map<String, dynamic> dataPayload = {};
-        try {
-          dataPayload = jsonDecode(collecte.dataJson) as Map<String, dynamic>;
-        } catch (_) {
-          dataPayload = {'raw': collecte.dataJson};
-        }
-
-        final createRequest = {
-          'formVersionId': collecte.formVersionId,
-          'dataJson': jsonEncode(dataPayload),
-          'latitude': collecte.latitude,
-          'longitude': collecte.longitude,
-          'missionId': ?collecte.missionId,
-        };
-
-        final formData = FormData.fromMap({
-          'data': MultipartFile.fromString(
-            jsonEncode(createRequest),
-            contentType: MediaType('application', 'json'),
-            filename: 'data.json',
-          ),
-        });
-
-        await _appendFiles(formData, collecte.photoPaths);
-        await _appendFiles(formData, collecte.documentPaths);
-
-        final response = await _apiClient.dio.post(
-          '/collectes/upload',
-          data: formData,
+        final response = await _postCollecteWithRetry(
+          collecte,
+          maxRetries: maxRetries,
+          initialDelay: initialDelay,
+          backoffMultiplier: backoffMultiplier,
+          maxDelay: maxDelay,
         );
 
         final responseData = response.data;
@@ -107,6 +97,12 @@ class SyncService {
           result: isDuplicate ? 'DUPLICATE' : 'ERROR',
           errorMessage: errorMsg,
         );
+
+        // Si rupture de réseau totale confirmée, arrêt anticipé pour économiser la batterie
+        if (e.type == DioExceptionType.connectionError || e.type == DioExceptionType.connectionTimeout) {
+          AppLogger.warn('SyncService', 'Arrêt de la file de synchronisation suite à une perte de connexion réseau', e.stackTrace);
+          break;
+        }
       } catch (e) {
         failedCount++;
         final errorMsg = e.toString();
@@ -129,6 +125,107 @@ class SyncService {
     );
   }
 
+  /// Exécute l'envoi d'une collecte avec réessais et backoff exponentiel.
+  Future<Response> _postCollecteWithRetry(
+    dynamic collecte, {
+    required int maxRetries,
+    required Duration initialDelay,
+    required double backoffMultiplier,
+    required Duration maxDelay,
+  }) async {
+    int attempt = 0;
+    Duration currentDelay = initialDelay;
+
+    while (true) {
+      attempt++;
+      try {
+        // Construction fraîche du FormData à chaque tentative (streams non épuisés)
+        final formData = await _buildFormData(collecte);
+        return await _apiClient.dio.post(
+          '/collectes/upload',
+          data: formData,
+        );
+      } catch (e, st) {
+        final isRetryable = _isRetryableError(e);
+
+        if (attempt >= maxRetries || !isRetryable) {
+          AppLogger.warn(
+            'SyncService: Échec de transmission pour collecte #${collecte.id} après $attempt tentative(s)',
+            e,
+            st,
+          );
+          rethrow;
+        }
+
+        AppLogger.warn(
+          'SyncService: Échec transitoire pour collecte #${collecte.id} (tentative $attempt/$maxRetries). Prochain essai dans ${currentDelay.inMilliseconds}ms',
+          e,
+          st,
+        );
+
+        await Future.delayed(currentDelay);
+        final nextMs = (currentDelay.inMilliseconds * backoffMultiplier).round();
+        currentDelay = Duration(milliseconds: nextMs.clamp(0, maxDelay.inMilliseconds));
+      }
+    }
+  }
+
+  /// Détermine si une erreur est transitoire et justifie un réessai.
+  bool _isRetryableError(dynamic error) {
+    if (error is DioException) {
+      switch (error.type) {
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.sendTimeout:
+        case DioExceptionType.receiveTimeout:
+        case DioExceptionType.connectionError:
+          return true;
+        case DioExceptionType.badResponse:
+          final status = error.response?.statusCode;
+          // Erreurs serveur 5xx ou 429 Too Many Requests
+          return status != null && (status >= 500 || status == 429);
+        default:
+          return error.error is SocketException;
+      }
+    }
+    return error is SocketException;
+  }
+
+  /// Construit le FormData multipart pour la transmission d'une collecte.
+  Future<FormData> _buildFormData(dynamic collecte) async {
+    Map<String, dynamic> dataPayload = {};
+    try {
+      dataPayload = jsonDecode(collecte.dataJson) as Map<String, dynamic>;
+    } catch (e, st) {
+      AppLogger.warn(
+        'SyncService._buildFormData (parsing dataJson collecte #${collecte.id})',
+        e,
+        st,
+      );
+      dataPayload = {'raw': collecte.dataJson};
+    }
+
+    final createRequest = {
+      'formVersionId': collecte.formVersionId,
+      'dataJson': jsonEncode(dataPayload),
+      'latitude': collecte.latitude,
+      'longitude': collecte.longitude,
+      'missionId': ?collecte.missionId,
+    };
+
+    final formData = FormData.fromMap({
+      'data': MultipartFile.fromString(
+        jsonEncode(createRequest),
+        contentType: MediaType('application', 'json'),
+        filename: 'data.json',
+      ),
+    });
+
+    await _appendFiles(formData, collecte.photoPaths);
+    await _appendFiles(formData, collecte.documentPaths);
+
+    return formData;
+  }
+
   /// Envoie un log de tentative de synchronisation au serveur. Best-effort :
   /// un échec de ce log ne doit jamais faire planter le flux de sync principal.
   Future<void> _reportSyncAttempt({
@@ -144,8 +241,8 @@ class SyncService {
         'result': result,
         'errorMessage': ?errorMessage,
       });
-    } catch (_) {
-      // Silencieux : le sync-log est un journal secondaire, pas critique.
+    } catch (e, st) {
+      AppLogger.warn('SyncService._reportSyncAttempt', e, st);
     }
   }
 
@@ -162,7 +259,13 @@ class SyncService {
           ));
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warn(
+        'SyncService._appendFiles (collecte photos/docs)',
+        e,
+        st,
+      );
+    }
   }
 
   Future<void> _deleteLocalMediaFiles(dynamic collecte) async {
@@ -180,7 +283,9 @@ class SyncService {
           await file.delete();
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      AppLogger.warn('SyncService._deletePathsFromJson', e, st);
+    }
   }
 
   /// Récupère l'état de validation de toutes les collectes de l'agent
@@ -213,8 +318,8 @@ class SyncService {
               : null,
         );
       }
-    } catch (_) {
-      // Best-effort : un échec de pull ne doit pas bloquer le reste de l'app.
+    } catch (e, st) {
+      AppLogger.warn('SyncService.pullValidationStatuses', e, st);
     }
   }
 

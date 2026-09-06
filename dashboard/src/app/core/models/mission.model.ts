@@ -76,3 +76,14 @@ export interface MissionProgressResponse {
     activeAgentsCount: number;
     assignedAgentsCount: number;
 }
+
+/** Fix #12 — représente la réponse paginée retournée par Spring Page<MissionResponse>. */
+export interface MissionResponsePage {
+    content: MissionResponse[];
+    totalElements: number;
+    totalPages: number;
+    number: number;
+    size: number;
+    first: boolean;
+    last: boolean;
+}

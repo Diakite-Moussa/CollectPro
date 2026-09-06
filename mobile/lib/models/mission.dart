@@ -39,6 +39,8 @@ class MissionSummary {
           .toList(),
     );
   }
+
+  bool get isCompleted => status == 'COMPLETED';
 }
 
 class MissionFormRef {

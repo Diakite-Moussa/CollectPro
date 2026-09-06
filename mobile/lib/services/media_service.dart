@@ -1,5 +1,6 @@
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'app_logger.dart';
 
 class MediaService {
   final ImagePicker _picker = ImagePicker();
@@ -12,7 +13,8 @@ class MediaService {
         imageQuality: 80,
       );
       return photo?.path;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warn('MediaService.takePhoto', e, st);
       return null;
     }
   }
@@ -25,7 +27,8 @@ class MediaService {
         imageQuality: 80,
       );
       return image?.path;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warn('MediaService.pickImageFromGallery', e, st);
       return null;
     }
   }
@@ -41,7 +44,8 @@ class MediaService {
         return result.files.single.path;
       }
       return null;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warn('MediaService.pickDocument', e, st);
       return null;
     }
   }

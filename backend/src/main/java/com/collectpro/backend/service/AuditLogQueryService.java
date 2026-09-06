@@ -8,10 +8,10 @@ import com.collectpro.backend.exception.ResourceNotFoundException;
 import com.collectpro.backend.repository.AuditLogRepository;
 import com.collectpro.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -20,23 +20,26 @@ public class AuditLogQueryService {
     private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
 
+    /**
+     * Fix #12 — pagination serveur.
+     */
     @Transactional(readOnly = true)
-    public List<AuditLogResponse> getAuditLogsForUser(User requester) {
+    public Page<AuditLogResponse> getAuditLogsForUser(User requester, Pageable pageable) {
         User managedRequester = userRepository.findById(requester.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
-        List<AuditLog> logs;
+        Page<AuditLog> page;
         if (managedRequester.getRole().getName() == RoleType.SUPER_ADMIN) {
-            logs = auditLogRepository.findAllByOrderByCreatedAtDesc();
+            page = auditLogRepository.findAllByOrderByCreatedAtDesc(pageable);
         } else {
             if (managedRequester.getOrganization() == null) {
-                return List.of();
+                return Page.empty(pageable);
             }
-            logs = auditLogRepository.findByOrganizationIdOrderByCreatedAtDesc(
-                    managedRequester.getOrganization().getId());
+            page = auditLogRepository.findByOrganizationIdOrderByCreatedAtDesc(
+                    managedRequester.getOrganization().getId(), pageable);
         }
 
-        return logs.stream().map(this::toResponse).toList();
+        return page.map(this::toResponse);
     }
 
     private AuditLogResponse toResponse(AuditLog log) {

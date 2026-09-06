@@ -1,9 +1,9 @@
-import { Component, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
-import { MatTableModule, MatTableDataSource } from '@angular/material/table';
-import { MatPaginatorModule, MatPaginator } from '@angular/material/paginator';
+import { MatTableModule } from '@angular/material/table';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -39,8 +39,8 @@ import { AuditLogResponse } from '../../core/models/audit-log.model';
       <mat-card class="filter-card">
         <mat-card-content class="filter-content">
           <mat-form-field appearance="outline" class="search-field">
-            <mat-label>Rechercher (Acteur, Détails, Entité)</mat-label>
-            <input matInput (keyup)="applyFilter($event)" placeholder="Ex: admin@test.com...">
+            <mat-label>Rechercher (page actuelle uniquement)</mat-label>
+            <input matInput [(ngModel)]="searchTerm" (ngModelChange)="applyFilter()" placeholder="Ex: admin@test.com...">
             <mat-icon matSuffix>search</mat-icon>
           </mat-form-field>
 
@@ -56,7 +56,7 @@ import { AuditLogResponse } from '../../core/models/audit-log.model';
 
       <mat-card class="table-card mt-4">
         <mat-card-content>
-          <table mat-table [dataSource]="dataSource" class="w-full">
+          <table mat-table [dataSource]="filteredLogs" class="w-full">
             <ng-container matColumnDef="createdAt">
               <th mat-header-cell *matHeaderCellDef> Date & Heure </th>
               <td mat-cell *matCellDef="let row">
@@ -105,7 +105,16 @@ import { AuditLogResponse } from '../../core/models/audit-log.model';
             <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
           </table>
 
-          <mat-paginator [pageSizeOptions]="[10, 25, 50]" showFirstLastButtons></mat-paginator>
+          <!-- Fix #12 : pagination serveur — [length]/[pageIndex]/[pageSize] pilotés
+               par le backend, (page) déclenche un nouvel appel HTTP. -->
+          <mat-paginator
+            [length]="totalElements"
+            [pageIndex]="pageIndex"
+            [pageSize]="pageSize"
+            [pageSizeOptions]="[10, 25, 50]"
+            showFirstLastButtons
+            (page)="onPageChange($event)">
+          </mat-paginator>
         </mat-card-content>
       </mat-card>
     </div>
@@ -138,30 +147,60 @@ import { AuditLogResponse } from '../../core/models/audit-log.model';
 export class AuditLogsComponent implements OnInit {
   private auditLogService = inject(AuditLogService);
 
-  dataSource = new MatTableDataSource<AuditLogResponse>([]);
+  logs: AuditLogResponse[] = [];
+  filteredLogs: AuditLogResponse[] = [];
   displayedColumns = ['createdAt', 'actor', 'action', 'target', 'details'];
   availableActions: string[] = [];
 
-  @ViewChild(MatPaginator) paginator!: MatPaginator;
+  // Fix #12 — état de pagination serveur
+  pageIndex = 0;
+  pageSize = 25;
+  totalElements = 0;
+
+  searchTerm = '';
+  selectedAction = '';
 
   ngOnInit(): void {
-    this.auditLogService.getAuditLogs().subscribe({
-      next: (logs) => {
-        this.dataSource.data = logs;
-        this.dataSource.paginator = this.paginator;
-        this.availableActions = Array.from(new Set(logs.map(l => l.action)));
+    this.loadLogs();
+  }
+
+  loadLogs(): void {
+    this.auditLogService.getAuditLogs(this.pageIndex, this.pageSize).subscribe({
+      next: (page) => {
+        this.logs = page.content;
+        this.totalElements = page.totalElements;
+        // Reconstruit la liste des actions disponibles à partir de la page courante
+        // (limitation acceptée : ne reflète pas forcément tout l'historique).
+        this.availableActions = Array.from(new Set(this.logs.map(l => l.action)));
+        this.applyFilter();
       },
-      error: () => {}
+      error: () => { }
     });
   }
 
-  applyFilter(event: Event): void {
-    const filterValue = (event.target as HTMLInputElement).value;
-    this.dataSource.filter = filterValue.trim().toLowerCase();
+  onPageChange(event: PageEvent): void {
+    this.pageIndex = event.pageIndex;
+    this.pageSize = event.pageSize;
+    this.loadLogs();
+  }
+
+  applyFilter(): void {
+    const term = this.searchTerm.trim().toLowerCase();
+    this.filteredLogs = this.logs.filter((log) => {
+      const matchesAction = !this.selectedAction || log.action === this.selectedAction;
+      if (!matchesAction) return false;
+      if (!term) return true;
+      const haystack = [
+        log.actor?.firstName, log.actor?.lastName, log.actor?.email,
+        log.action, log.entityType, log.details
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(term);
+    });
   }
 
   onActionFilterChange(action: string): void {
-    this.dataSource.filter = action.trim().toLowerCase();
+    this.selectedAction = action;
+    this.applyFilter();
   }
 
   getActionClass(action: string): string {

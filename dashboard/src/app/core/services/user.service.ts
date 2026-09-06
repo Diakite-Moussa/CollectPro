@@ -3,6 +3,8 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { AssignSupervisorRequest, ChangePasswordRequest, CreateUserRequest, UpdateProfileRequest, UpdateUserStatusRequest, UserResponse } from '../models/user.model';
 import { environment } from '../../../environments/environment';
+import { HttpParams } from '@angular/common/http';
+import { UserResponsePage } from '../models/user.model';
 
 @Injectable({
   providedIn: 'root'
@@ -10,10 +12,16 @@ import { environment } from '../../../environments/environment';
 export class UserService {
   private readonly apiUrl = `${environment.apiUrl}/users`;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
-  getUsers(): Observable<UserResponse[]> {
-    return this.http.get<UserResponse[]>(this.apiUrl);
+  /**
+ * Fix #12 — pagination serveur.
+ */
+  getUsers(page = 0, size = 25): Observable<UserResponsePage> {
+    const params = new HttpParams()
+      .set('page', page.toString())
+      .set('size', size.toString());
+    return this.http.get<UserResponsePage>(this.apiUrl, { params });
   }
 
   createUser(request: CreateUserRequest): Observable<UserResponse> {

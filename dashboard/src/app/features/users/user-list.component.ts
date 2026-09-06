@@ -14,8 +14,9 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { UserService } from '../../core/services/user.service';
 import { PermissionService } from '../../core/services/permission.service';
 import { AuthService } from '../../core/services/auth.service';
-import { UserResponse } from '../../core/models/user.model';
+import { UserResponse, UserResponsePage } from '../../core/models/user.model';
 import { PermissionResponse } from '../../core/models/permission.model';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 
 @Component({
   selector: 'app-user-dialog',
@@ -269,7 +270,8 @@ export class UserPermissionsDialogComponent {
     MatButtonModule,
     MatIconModule,
     MatChipsModule,
-    MatDialogModule
+    MatDialogModule,
+    MatPaginatorModule  // ✅ Ajout de MatPaginatorModule
   ],
   template: `
     <div class="user-container">
@@ -307,6 +309,19 @@ export class UserPermissionsDialogComponent {
                 <span class="role-badge" [ngClass]="user.role.toLowerCase()">
                   {{ user.role }}
                 </span>
+              </td>
+            </ng-container>
+
+            <ng-container matColumnDef="organization">
+              <th mat-header-cell *matHeaderCellDef> Organisation </th>
+              <td mat-cell *matCellDef="let user">
+                <span class="org-badge" *ngIf="user.organizationName; else noOrg">
+                  <mat-icon inline>corporate_fare</mat-icon>
+                  {{ user.organizationName }}
+                </span>
+                <ng-template #noOrg>
+                  <span class="no-org">—</span>
+                </ng-template>
               </td>
             </ng-container>
 
@@ -371,6 +386,16 @@ export class UserPermissionsDialogComponent {
             <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
             <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
           </table>
+
+          <!-- ✅ Fix #12 : pagination serveur -->
+          <mat-paginator
+            [length]="totalElements"
+            [pageIndex]="pageIndex"
+            [pageSize]="pageSize"
+            [pageSizeOptions]="[10, 25, 50]"
+            showFirstLastButtons
+            (page)="onPageChange($event)">
+          </mat-paginator>
         </mat-card-content>
       </mat-card>
     </div>
@@ -398,6 +423,26 @@ export class UserPermissionsDialogComponent {
       &.admin_principal { background: #eff6ff; color: #1e40af; }
       &.supervisor { background: #f0fdf4; color: #166534; }
       &.agent { background: #faf5ff; color: #6b21a8; }
+    }
+    .org-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.85rem;
+      color: #1e40af;
+      background: #eff6ff;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 500;
+      mat-icon {
+        font-size: 16px;
+        width: 16px;
+        height: 16px;
+      }
+    }
+    .no-org {
+      color: #94a3b8;
+      font-size: 0.9rem;
     }
     .supervisor-assigned {
       display: inline-flex;
@@ -428,7 +473,13 @@ export class UserPermissionsDialogComponent {
 })
 export class UserListComponent implements OnInit {
   users: UserResponse[] = [];
-  displayedColumns = ['id', 'name', 'email', 'role', 'status', 'actions'];
+  displayedColumns = ['id', 'name', 'email', 'role', 'organization', 'status', 'actions'];
+
+  // ✅ Fix #12 — état de pagination serveur
+  pageIndex = 0;
+  pageSize = 25;
+  totalElements = 0;
+
   resendingId: number | null = null;
   assigningAgentId: number | null = null;
   permissionsUserId: number | null = null;
@@ -456,11 +507,22 @@ export class UserListComponent implements OnInit {
     this.loadUsers();
   }
 
+  /** ✅ Fix #12 — pagination serveur. */
   loadUsers(): void {
-    this.userService.getUsers().subscribe({
-      next: (users) => this.users = users,
+    this.userService.getUsers(this.pageIndex, this.pageSize).subscribe({
+      next: (page: UserResponsePage) => {
+        this.users = page.content;
+        this.totalElements = page.totalElements;
+      },
       error: (err) => console.error('Erreur de chargement des utilisateurs', err)
     });
+  }
+
+  /** ✅ Fix #12 — gestion du changement de page */
+  onPageChange(event: PageEvent): void {
+    this.pageIndex = event.pageIndex;
+    this.pageSize = event.pageSize;
+    this.loadUsers();
   }
 
   resend(user: UserResponse): void {
@@ -489,10 +551,24 @@ export class UserListComponent implements OnInit {
     });
   }
 
+  /**
+   * ✅ Fix #12 — la liste des superviseurs doit couvrir toute l'organisation,
+   * pas seulement la page actuellement affichée dans le tableau principal.
+   * On récupère donc une page large dédiée à cet usage.
+   */
   openAssignSupervisor(agent: UserResponse): void {
-    const supervisors = this.users.filter(
-      (u) => u.role === 'SUPERVISOR' && u.status === 'ACTIVE'
-    );
+    this.userService.getUsers(0, 500).subscribe({
+      next: (page: UserResponsePage) => {
+        const supervisors = page.content.filter(
+          (u) => u.role === 'SUPERVISOR' && u.status === 'ACTIVE'
+        );
+        this.openAssignSupervisorDialog(agent, supervisors);
+      },
+      error: (err) => alert(err?.error?.message || 'Impossible de charger la liste des superviseurs')
+    });
+  }
+
+  private openAssignSupervisorDialog(agent: UserResponse, supervisors: UserResponse[]): void {
     const dialogRef = this.dialog.open(AssignSupervisorDialogComponent, {
       width: '480px',
       data: { agent, supervisors }

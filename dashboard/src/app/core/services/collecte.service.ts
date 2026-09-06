@@ -3,6 +3,8 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { CollecteResponse } from '../models/collecte.model';
 import { environment } from '../../../environments/environment';
+import { HttpParams } from '@angular/common/http';
+import { CollecteResponsePage } from '../models/collecte.model';
 
 @Injectable({
   providedIn: 'root'
@@ -10,23 +12,28 @@ import { environment } from '../../../environments/environment';
 export class CollecteService {
   private readonly apiUrl = `${environment.apiUrl}/collectes`;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   getMyCollectes(): Observable<CollecteResponse[]> {
     return this.http.get<CollecteResponse[]>(`${this.apiUrl}/mine`);
   }
 
-  getTeamCollectes(): Observable<CollecteResponse[]> {
-    return this.http.get<CollecteResponse[]>(`${this.apiUrl}/team`);
+  /** Fix #12 — pagination serveur. */
+  getTeamCollectes(page = 0, size = 25): Observable<CollecteResponsePage> {
+    const params = new HttpParams().set('page', page.toString()).set('size', size.toString());
+    return this.http.get<CollecteResponsePage>(`${this.apiUrl}/team`, { params });
   }
 
-  /** Vue Admin : toutes les collectes de l'organisation. */
-  getOrganizationCollectes(): Observable<CollecteResponse[]> {
-    return this.http.get<CollecteResponse[]>(`${this.apiUrl}/organization`);
+  /** Vue Admin : toutes les collectes de l'organisation. Fix #12 — pagination serveur. */
+  getOrganizationCollectes(page = 0, size = 25): Observable<CollecteResponsePage> {
+    const params = new HttpParams().set('page', page.toString()).set('size', size.toString());
+    return this.http.get<CollecteResponsePage>(`${this.apiUrl}/organization`, { params });
   }
 
-  getPendingValidation(): Observable<CollecteResponse[]> {
-    return this.http.get<CollecteResponse[]>(`${this.apiUrl}/team/pending-validation`);
+  /** Fix #12 — pagination serveur. */
+  getPendingValidation(page = 0, size = 25): Observable<CollecteResponsePage> {
+    const params = new HttpParams().set('page', page.toString()).set('size', size.toString());
+    return this.http.get<CollecteResponsePage>(`${this.apiUrl}/team/pending-validation`, { params });
   }
 
   /** RF-012 : validation d'une collecte par son superviseur (commentaire facultatif). */

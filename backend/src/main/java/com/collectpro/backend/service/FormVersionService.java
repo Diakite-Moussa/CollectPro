@@ -23,6 +23,7 @@ public class FormVersionService {
     @Transactional
     public FormVersionResponse createVersion(Long formId, CreateFormVersionRequest request, User createdBy) {
         Form form = formService.getFormEntity(formId);
+        formService.assertSameOrganization(form, createdBy);
 
         int nextVersionNumber = formVersionRepository.findFirstByFormOrderByVersionNumberDesc(form)
                 .map(v -> v.getVersionNumber() + 1)
@@ -43,12 +44,15 @@ public class FormVersionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Version de formulaire introuvable (id=" + versionId + ")"));
     }
 
-    public FormVersionResponse getVersionResponse(Long versionId) {
-        return toResponse(getVersionEntity(versionId));
+    public FormVersionResponse getVersionResponse(Long versionId, User actor) {
+        FormVersion version = getVersionEntity(versionId);
+        formService.assertSameOrganization(version.getForm(), actor);
+        return toResponse(version);
     }
 
-    public List<FormVersionResponse> getVersionsForForm(Long formId) {
+    public List<FormVersionResponse> getVersionsForForm(Long formId, User actor) {
         Form form = formService.getFormEntity(formId);
+        formService.assertSameOrganization(form, actor);
         return formVersionRepository.findByFormOrderByVersionNumberDesc(form).stream()
                 .map(this::toResponse)
                 .toList();

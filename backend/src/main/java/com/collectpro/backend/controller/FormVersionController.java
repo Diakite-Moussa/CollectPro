@@ -33,7 +33,9 @@ public class FormVersionController {
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<FormVersionResponse>> getVersions(@PathVariable Long formId) {
-        return ResponseEntity.ok(formVersionService.getVersionsForForm(formId));
+    public ResponseEntity<List<FormVersionResponse>> getVersions(
+            @PathVariable Long formId,
+            @AuthenticationPrincipal CustomUserDetails principal) {
+        return ResponseEntity.ok(formVersionService.getVersionsForForm(formId, principal.getUser()));
     }
 }

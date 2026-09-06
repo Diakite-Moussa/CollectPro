@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'token_storage.dart';
 import '../constante/environnement.dart';
+import 'app_logger.dart';
 
 String get kBaseUrl {
   const envUrl = String.fromEnvironment('API_URL');
@@ -24,13 +25,16 @@ class ApiClient {
   final TokenStorage _tokenStorage;
   SessionExpiredCallback? onSessionExpired;
 
+  // Verrou de refresh : Future en cours, ou null si aucun refresh en cours.
+  Future<bool>? _refreshFuture;
+
   ApiClient(this._tokenStorage)
       : dio = Dio(BaseOptions(
-          baseUrl: kBaseUrl,
-          connectTimeout: const Duration(seconds: 30),
-          receiveTimeout: const Duration(seconds: 30),
-          headers: {'X-Client-Platform': 'MOBILE'},
-        )) {
+    baseUrl: kBaseUrl,
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 30),
+    headers: {'X-Client-Platform': 'MOBILE'},
+  )) {
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
         if (!_isPublicRoute(options.path)) {
@@ -47,7 +51,7 @@ class ApiClient {
             !_isPublicRoute(path) &&
             !path.contains('/refresh') &&
             error.requestOptions.extra['retried'] != true) {
-          final refreshed = await refreshTokens();
+          final refreshed = await _refreshTokensSafe(); // ← Utilisation de la méthode sécurisée
           if (refreshed) {
             error.requestOptions.extra['retried'] = true;
             final token = await _tokenStorage.getAccessToken();
@@ -55,7 +59,9 @@ class ApiClient {
             try {
               final response = await dio.fetch(error.requestOptions);
               return handler.resolve(response);
-            } catch (_) {}
+            } catch (e, st) {
+              AppLogger.warn('ApiClient retry after refresh', e, st);
+            }
           } else {
             onSessionExpired?.call();
           }
@@ -69,7 +75,24 @@ class ApiClient {
     return path.contains('/login') ||
         path.contains('/activate') ||
         path.contains('/refresh') ||
-        path.contains('/organizations');
+        RegExp(r'^/files/organizations/\d+/logo$').hasMatch(path);
+  }
+
+  /// Mutualise les appels de refresh concurrents : si un refresh est déjà
+  /// en cours, on attend son résultat au lieu d'en relancer un nouveau.
+  Future<bool> _refreshTokensSafe() {
+    if (_refreshFuture != null) {
+      return _refreshFuture!;
+    }
+
+    final future = refreshTokens();
+    _refreshFuture = future;
+
+    future.whenComplete(() {
+      _refreshFuture = null;
+    });
+
+    return future;
   }
 
   /// Tente de renouveler les tokens. Retourne true si succès.
@@ -85,26 +108,27 @@ class ApiClient {
         refreshToken: newRefreshToken,
       );
       return true;
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warn('ApiClient.refreshTokens', e, st);
       await _tokenStorage.clear();
       return false;
     }
   }
 
   Future<Response<T>> post<T>(
-    String path, {
-    Object? data,
-    Map<String, dynamic>? queryParameters,
-    Options? options,
-  }) {
+      String path, {
+        Object? data,
+        Map<String, dynamic>? queryParameters,
+        Options? options,
+      }) {
     return dio.post<T>(path, data: data, queryParameters: queryParameters, options: options);
   }
 
   Future<Response<T>> get<T>(
-    String path, {
-    Map<String, dynamic>? queryParameters,
-    Options? options,
-  }) {
+      String path, {
+        Map<String, dynamic>? queryParameters,
+        Options? options,
+      }) {
     return dio.get<T>(path, queryParameters: queryParameters, options: options);
   }
 }

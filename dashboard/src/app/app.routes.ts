@@ -1,42 +1,74 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
-import { LoginComponent } from './features/auth/login.component';
 import { MainLayoutComponent } from './features/layout/main-layout.component';
-import { DashboardHomeComponent } from './features/home/dashboard-home.component';
-import { OrganizationListComponent } from './features/organizations/organization-list.component';
-import { UserListComponent } from './features/users/user-list.component';
-import { FormListComponent } from './features/forms/form-list.component';
-import { CollecteListComponent } from './features/collectes/collecte-list.component';
-import { ActivationComponent } from './features/auth/activation.component';
-import { AuditLogsComponent } from './features/audit-logs/audit-logs.component';
-import { ForgotPasswordComponent } from './features/auth/forgot-password.component';
-import { ResetPasswordComponent } from './features/auth/reset-password.component';
-import { ProfileComponent } from './features/profile/profile.component';
-import { SyncLogListComponent } from './features/sync-logs/sync-log-list.component';
-import { MissionListComponent } from './features/missions/mission-list.component';
-
 
 export const routes: Routes = [
-  { path: 'login', component: LoginComponent },
-  { path: 'activate', component: ActivationComponent },
-  { path: 'forgot-password', component: ForgotPasswordComponent },
-  { path: 'reset-password', component: ResetPasswordComponent },
+  {
+    path: 'login',
+    loadComponent: () => import('./features/auth/login.component').then(m => m.LoginComponent)
+  },
+  {
+    path: 'activate',
+    loadComponent: () => import('./features/auth/activation.component').then(m => m.ActivationComponent)
+  },
+  {
+    path: 'forgot-password',
+    loadComponent: () => import('./features/auth/forgot-password.component').then(m => m.ForgotPasswordComponent)
+  },
+  {
+    path: 'reset-password',
+    loadComponent: () => import('./features/auth/reset-password.component').then(m => m.ResetPasswordComponent)
+  },
   {
     path: '',
     component: MainLayoutComponent,
     canActivate: [authGuard],
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
-      { path: 'dashboard', component: DashboardHomeComponent },
-      { path: 'organizations', component: OrganizationListComponent, canActivate: [roleGuard] },
-      { path: 'users', component: UserListComponent, canActivate: [roleGuard] },
-      { path: 'forms', component: FormListComponent, canActivate: [roleGuard] },
-      { path: 'collectes', component: CollecteListComponent, canActivate: [roleGuard] },
-      { path: 'sync-logs', component: SyncLogListComponent, canActivate: [roleGuard] },
-      { path: 'audit-logs', component: AuditLogsComponent, canActivate: [roleGuard] },
-      { path: 'profile', component: ProfileComponent },
-      { path: 'missions', component: MissionListComponent, canActivate: [roleGuard] },
+      {
+        path: 'dashboard',
+        loadComponent: () => import('./features/home/dashboard-home.component').then(m => m.DashboardHomeComponent)
+      },
+      {
+        path: 'organizations',
+        loadComponent: () => import('./features/organizations/organization-list.component').then(m => m.OrganizationListComponent),
+        canActivate: [roleGuard]
+      },
+      {
+        path: 'users',
+        loadComponent: () => import('./features/users/user-list.component').then(m => m.UserListComponent),
+        canActivate: [roleGuard]
+      },
+      {
+        path: 'forms',
+        loadComponent: () => import('./features/forms/form-list.component').then(m => m.FormListComponent),
+        canActivate: [roleGuard]
+      },
+      {
+        path: 'collectes',
+        loadComponent: () => import('./features/collectes/collecte-list.component').then(m => m.CollecteListComponent),
+        canActivate: [roleGuard]
+      },
+      {
+        path: 'sync-logs',
+        loadComponent: () => import('./features/sync-logs/sync-log-list.component').then(m => m.SyncLogListComponent),
+        canActivate: [roleGuard]
+      },
+      {
+        path: 'audit-logs',
+        loadComponent: () => import('./features/audit-logs/audit-logs.component').then(m => m.AuditLogsComponent),
+        canActivate: [roleGuard]
+      },
+      {
+        path: 'profile',
+        loadComponent: () => import('./features/profile/profile.component').then(m => m.ProfileComponent)
+      },
+      {
+        path: 'missions',
+        loadComponent: () => import('./features/missions/mission-list.component').then(m => m.MissionListComponent),
+        canActivate: [roleGuard]
+      },
     ]
   },
   { path: '**', redirectTo: 'login' }

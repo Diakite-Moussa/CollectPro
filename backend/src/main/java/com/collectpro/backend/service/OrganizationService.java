@@ -50,6 +50,11 @@ public class OrganizationService {
                     "Un utilisateur avec l'email '" + request.getAdminEmail() + "' existe déjà");
         }
 
+        if (organizationRepository.existsByNameIgnoreCase(request.getName())) {
+            throw new BusinessRuleException(
+                    "Une organisation nommée '" + request.getName() + "' existe déjà");
+        }
+
         Organization organization = Organization.builder()
                 .name(request.getName())
                 .description(request.getDescription())
@@ -103,6 +108,11 @@ public class OrganizationService {
     public OrganizationResponse updateOrganization(User actor, Long id, UpdateOrganizationRequest request) {
         Organization organization = organizationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Organisation introuvable"));
+
+        if (organizationRepository.existsByNameIgnoreCaseAndIdNot(request.getName(), id)) {
+            throw new BusinessRuleException(
+                    "Une organisation nommée '" + request.getName() + "' existe déjà");
+        }
 
         organization.setName(request.getName());
         organization.setDescription(request.getDescription());

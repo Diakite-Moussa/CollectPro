@@ -1,4 +1,5 @@
 import 'package:geolocator/geolocator.dart';
+import 'app_logger.dart';
 
 class LocationService {
   /// Obtient la position GPS actuelle de l'appareil.
@@ -30,7 +31,8 @@ class LocationService {
           timeLimit: Duration(seconds: 10),
         ),
       );
-    } catch (_) {
+    } catch (e, st) {
+      AppLogger.warn('LocationService.getCurrentLocation', e, st);
       return null;
     }
   }

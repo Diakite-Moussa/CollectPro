@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { HttpParams } from '@angular/common/http';
+import { MissionResponsePage } from '../models/mission.model';
 import {
     MissionResponse,
     CreateMissionRequest,
@@ -57,5 +59,11 @@ export class MissionService {
 
     getMissionProgress(id: number): Observable<MissionProgressResponse> {
         return this.http.get<MissionProgressResponse>(`${this.apiUrl}/${id}/progress`);
+    }
+
+    /** Fix #12 — pagination serveur, nouvel endpoint dédié dashboard. */
+    getMissionsPaged(page = 0, size = 25): Observable<MissionResponsePage> {
+        const params = new HttpParams().set('page', page.toString()).set('size', size.toString());
+        return this.http.get<MissionResponsePage>(`${this.apiUrl}/list`, { params });
     }
 }

@@ -10,13 +10,14 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatDialogModule, MatDialog, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatTabsModule, MatTabChangeEvent } from '@angular/material/tabs';
+import { MatTabsModule, MatTabChangeEvent, MatTabContent } from '@angular/material/tabs';
 import { MapViewComponent, MapMarker } from '../../shared/map-view/map-view.component';
 import { CollecteService } from '../../core/services/collecte.service';
 import { AuthService } from '../../core/services/auth.service';
 import { FileService } from '../../core/services/file.service';
 import { FormService } from '../../core/services/form.service';
-import { CollecteResponse } from '../../core/models/collecte.model';
+import { CollecteResponse, CollecteResponsePage } from '../../core/models/collecte.model';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 
 @Component({
   selector: 'app-collecte-detail-dialog',
@@ -204,7 +205,7 @@ export class RejectDialogComponent {
   constructor(
     public dialogRef: MatDialogRef<RejectDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: CollecteResponse
-  ) {}
+  ) { }
 }
 
 @Component({
@@ -219,7 +220,9 @@ export class RejectDialogComponent {
     MatChipsModule,
     MatDialogModule,
     MatTabsModule,
-    MapViewComponent
+    MatTabContent,
+    MapViewComponent,
+    MatPaginatorModule  // ✅ Ajout de MatPaginatorModule
   ],
   template: `
     <div class="collecte-container">
@@ -304,23 +307,35 @@ export class RejectDialogComponent {
             <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
             <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
           </table>
+
+          <!-- ✅ Fix #12 : pagination serveur -->
+          <mat-paginator
+            [length]="totalElements"
+            [pageIndex]="pageIndex"
+            [pageSize]="pageSize"
+            [pageSizeOptions]="[10, 25, 50]"
+            showFirstLastButtons
+            (page)="onPageChange($event)">
+          </mat-paginator>
         </mat-card-content>
       </mat-card>
         </mat-tab>
 
         <mat-tab label="Carte">
-          <mat-card class="table-card">
-            <mat-card-content>
-              <app-map-view
-                [markers]="collecteMarkers"
-                [defaultCenter]="[12.6392, -8.0029]"
-                [defaultZoom]="6">
-              </app-map-view>
-              <p *ngIf="!collecteMarkers.length" class="empty-state">
-                Aucune collecte géolocalisée
-              </p>
-            </mat-card-content>
-          </mat-card>
+          <ng-template matTabContent>
+            <mat-card class="table-card">
+              <mat-card-content>
+                <app-map-view
+                  [markers]="collecteMarkers"
+                  [defaultCenter]="[12.6392, -8.0029]"
+                  [defaultZoom]="6">
+                </app-map-view>
+                <p *ngIf="!collecteMarkers.length" class="empty-state">
+                  Aucune collecte géolocalisée
+                </p>
+              </mat-card-content>
+            </mat-card>
+          </ng-template>
         </mat-tab>
       </mat-tab-group>
     </div>
@@ -353,6 +368,11 @@ export class CollecteListComponent implements OnInit {
   collectes: CollecteResponse[] = [];
   collecteMarkers: MapMarker[] = [];
   displayedColumns = ['id', 'agent', 'coords', 'status', 'createdAt', 'actions'];
+
+  // ✅ Fix #12 — état de pagination serveur
+  pageIndex = 0;
+  pageSize = 25;
+  totalElements = 0;
   processingId: number | null = null;
   isSupervisor = false;
   isExportingCsv = false;
@@ -362,24 +382,33 @@ export class CollecteListComponent implements OnInit {
     private collecteService: CollecteService,
     private authService: AuthService,
     private dialog: MatDialog
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     this.isSupervisor = this.authService.currentUser()?.role === 'SUPERVISOR';
     this.loadCollectes();
   }
 
+  /** ✅ Fix #12 — pagination serveur. */
   loadCollectes(): void {
     const request$ = this.isSupervisor
-      ? this.collecteService.getTeamCollectes()
-      : this.collecteService.getOrganizationCollectes();
+      ? this.collecteService.getTeamCollectes(this.pageIndex, this.pageSize)
+      : this.collecteService.getOrganizationCollectes(this.pageIndex, this.pageSize);
     request$.subscribe({
-      next: (data) => {
-        this.collectes = data;
-        this.collecteMarkers = this.buildMarkers(data);
+      next: (page: CollecteResponsePage) => {
+        this.collectes = page.content;
+        this.totalElements = page.totalElements;
+        this.collecteMarkers = this.buildMarkers(page.content);
       },
       error: (err) => console.error(err)
     });
+  }
+
+  /** ✅ Fix #12 — gestion du changement de page */
+  onPageChange(event: PageEvent): void {
+    this.pageIndex = event.pageIndex;
+    this.pageSize = event.pageSize;
+    this.loadCollectes();
   }
 
   private buildMarkers(collectes: CollecteResponse[]): MapMarker[] {

@@ -24,6 +24,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.EnumSet;
 import java.util.List;
@@ -117,33 +119,35 @@ public class UserService {
      * voit tout le monde ; les autres rôles ne voient que les utilisateurs de
      * leur propre organisation.
      */
+    /**
+     * Fix #12 — pagination serveur. La supervisionMap est recalculée
+     * uniquement sur les agents de la page courante (pas sur tous les users).
+     */
     @Transactional(readOnly = true)
-    public List<UserResponse> getUsers(User requester) {
+    public Page<UserResponse> getUsers(User requester, Pageable pageable) {
         User managedRequester = userRepository.findById(requester.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur introuvable"));
 
-        List<User> users;
+        Page<User> usersPage;
         if (managedRequester.getRole().getName() == RoleType.SUPER_ADMIN) {
-            users = userRepository.findAll();
+            usersPage = userRepository.findAll(pageable);
         } else {
             if (managedRequester.getOrganization() == null) {
                 throw new BusinessRuleException("Utilisateur sans organisation");
             }
-            users = userRepository.findByOrganizationId(managedRequester.getOrganization().getId());
+            usersPage = userRepository.findByOrganizationId(managedRequester.getOrganization().getId(), pageable);
         }
 
-        List<Long> agentIds = users.stream()
+        List<Long> agentIds = usersPage.getContent().stream()
                 .filter(u -> u.getRole().getName() == RoleType.AGENT)
                 .map(User::getId)
                 .toList();
         Map<Long, SupervisorAgent> supervisionMap = agentIds.isEmpty()
                 ? Map.of()
                 : supervisorAgentRepository.findByAgentIdIn(agentIds).stream()
-                        .collect(Collectors.toMap(sa -> sa.getAgent().getId(), sa -> sa));
+                .collect(Collectors.toMap(sa -> sa.getAgent().getId(), sa -> sa));
 
-        return users.stream()
-                .map(u -> toResponse(u, supervisionMap.get(u.getId())))
-                .toList();
+        return usersPage.map(u -> toResponse(u, supervisionMap.get(u.getId())));
     }
 
     @Transactional

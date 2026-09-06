@@ -29,3 +29,14 @@ export interface CollecteResponse {
   missionId?: number;
   outsideMissionZone?: boolean | null;
 }
+
+/** Fix #12 — représente la réponse paginée retournée par Spring Page<CollecteResponse>. */
+export interface CollecteResponsePage {
+  content: CollecteResponse[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+  first: boolean;
+  last: boolean;
+}
