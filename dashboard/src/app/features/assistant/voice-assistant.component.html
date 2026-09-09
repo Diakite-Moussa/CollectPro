@@ -1,0 +1,189 @@
+<div class="assistant-container">
+
+  <!-- Panneau de discussion flottant -->
+  <div class="assistant-panel shadow-lg" [class.open]="isOpen()">
+
+    <!-- En-tête -->
+    <div class="panel-header">
+      <div class="header-title">
+        <mat-icon class="ai-icon">smart_toy</mat-icon>
+        <div class="title-text">
+          <span class="main-title">Assistant CollectPro</span>
+          <span class="status-badge" [ngClass]="state().toLowerCase()">
+            <span class="pulse-dot" *ngIf="state() === 'LISTENING' || state() === 'SPEAKING' || state() === 'PROCESSING'"></span>
+            {{ state() === 'LISTENING' ? 'À l\'écoute...' :
+               state() === 'PROCESSING' ? 'Analyse en cours...' :
+               state() === 'SPEAKING' ? 'Parole...' :
+               state() === 'CONFIRMING' ? 'Confirmation requise' : 'Prêt' }}
+          </span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Effacer la discussion -->
+        <button mat-icon-button (click)="clearMessages()" matTooltip="Effacer l'historique">
+          <mat-icon>delete_sweep</mat-icon>
+        </button>
+
+        <!-- Bouton mute/unmute voix TTS -->
+        <button mat-icon-button (click)="toggleSpeechOutput()" [matTooltip]="speechEnabled() ? 'Couper la voix' : 'Activer la voix'">
+          <mat-icon>{{ speechEnabled() ? 'volume_up' : 'volume_off' }}</mat-icon>
+        </button>
+
+        <!-- Fermer le panneau -->
+        <button mat-icon-button (click)="togglePanel()" matTooltip="Réduire">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <!-- Bannière d'erreur si présente -->
+    <div class="error-banner" *ngIf="errorMessage()">
+      <mat-icon>warning</mat-icon>
+      <span>{{ errorMessage() }}</span>
+    </div>
+
+    <!-- Zone des messages -->
+    <div class="messages-container" #messagesContainer>
+      <div *ngFor="let msg of messages()" class="message-row" [ngClass]="msg.sender">
+        <div class="avatar" *ngIf="msg.sender === 'assistant'">
+          <mat-icon>psychology</mat-icon>
+        </div>
+
+        <div class="message-bubble">
+          <div class="message-text">{{ msg.text }}</div>
+          <div class="message-meta">
+            <span class="message-time">{{ msg.timestamp | date:'HH:mm' }}</span>
+            <button type="button" class="btn-copy-msg" *ngIf="msg.sender === 'assistant'" (click)="copyMessage(msg)" [matTooltip]="copiedMessageId() === msg.id ? 'Copié !' : 'Copier'">
+              <mat-icon class="copy-icon">{{ copiedMessageId() === msg.id ? 'check' : 'content_copy' }}</mat-icon>
+            </button>
+          </div>
+
+          <!-- Bouton de téléchargement du rapport si généré -->
+          <div class="report-download-box" *ngIf="msg.reportId">
+            <button mat-stroked-button color="primary" class="btn-download-report" (click)="downloadReport(msg.reportId)">
+              <mat-icon>file_download</mat-icon>
+              <span>Télécharger le rapport PDF (#{{ msg.reportId }})</span>
+            </button>
+          </div>
+
+          <!-- Bouton de téléchargement de l'export Excel / CSV si généré -->
+          <div class="report-download-box" *ngIf="msg.exportFormat">
+            <button mat-stroked-button color="primary" class="btn-download-report" (click)="downloadExport(msg.exportFormat)">
+              <mat-icon>table_view</mat-icon>
+              <span>Télécharger l'export {{ msg.exportFormat === 'excel' ? 'Excel (.xlsx)' : 'CSV (.csv)' }}</span>
+            </button>
+          </div>
+
+          <!-- Bouton de redirection rapide si navigation demandée -->
+          <div class="report-download-box" *ngIf="msg.navigateTo">
+            <button mat-stroked-button color="accent" class="btn-download-report" (click)="navigateToRoute(msg.navigateTo)">
+              <mat-icon>open_in_new</mat-icon>
+              <span>Accéder à la page ({{ msg.navigateTo }})</span>
+            </button>
+          </div>
+
+          <!-- Boîte de confirmation interactive si requise -->
+          <div class="confirmation-box" *ngIf="msg.requiresConfirmation && pendingConfirmation()">
+            <div class="confirmation-prompt">
+              <mat-icon class="confirm-icon">help_outline</mat-icon>
+              <span>Voulez-vous exécuter cette action maintenant ?</span>
+            </div>
+            <div class="confirmation-actions">
+              <button mat-flat-button color="primary" class="btn-confirm" (click)="executeConfirmation(true)">
+                <mat-icon>check_circle</mat-icon>
+                Confirmer
+              </button>
+              <button mat-stroked-button color="warn" class="btn-cancel" (click)="executeConfirmation(false)">
+                <mat-icon>cancel</mat-icon>
+                Annuler
+              </button>
+            </div>
+            <div class="vocal-hint">
+              <mat-icon>mic</mat-icon>
+              <span>Vous pouvez aussi dire <strong>« Oui »</strong> ou <strong>« Non »</strong> au micro</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Indicateur de traitement IA -->
+      <div class="processing-row" *ngIf="state() === 'PROCESSING'">
+        <div class="avatar">
+          <mat-icon class="spin-icon">psychology</mat-icon>
+        </div>
+        <div class="processing-bubble">
+          <div class="typing-indicator">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <span class="processing-label">L'assistant réfléchit...</span>
+        </div>
+      </div>
+
+      <!-- Retranscription directe de la voix -->
+      <div class="interim-row" *ngIf="interimTranscript()">
+        <div class="interim-bubble">
+          <mat-icon class="listening-mic">mic</mat-icon>
+          <span class="interim-text">{{ interimTranscript() }}...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pied de page avec commandes vocales et champ texte -->
+    <div class="panel-footer">
+      <!-- Suggestions rapides cliquables -->
+      <div class="quick-prompts-bar" *ngIf="state() === 'IDLE'">
+        <button type="button" class="quick-chip" *ngFor="let prompt of quickPrompts" (click)="selectQuickPrompt(prompt)">
+          {{ prompt }}
+        </button>
+      </div>
+
+      <!-- Barre d'onde vocale quand le micro écoute -->
+      <div class="vocal-active-bar" *ngIf="state() === 'LISTENING'">
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <span>Parlez maintenant, l'assistant vous écoute...</span>
+      </div>
+
+      <div class="input-row">
+        <!-- Bouton Micro Principal -->
+        <button mat-mini-fab [color]="state() === 'LISTENING' ? 'warn' : 'primary'"
+                class="mic-button"
+                (click)="toggleListening()"
+                [class.pulsing]="state() === 'LISTENING'"
+                [matTooltip]="state() === 'LISTENING' ? 'Arrêter l\'écoute' : 'Parler au micro'">
+          <mat-icon>{{ state() === 'LISTENING' ? 'mic' : 'mic_none' }}</mat-icon>
+        </button>
+
+        <!-- Saisie texte de secours -->
+        <div class="text-input-wrapper">
+          <input type="text"
+                 [(ngModel)]="textInput"
+                 (keyup.enter)="sendTextMessage()"
+                 placeholder="Ou posez votre question par écrit..."
+                 [disabled]="state() === 'PROCESSING'" />
+          <button mat-icon-button (click)="sendTextMessage()" [disabled]="!textInput.trim() || state() === 'PROCESSING'">
+            <mat-icon>send</mat-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bouton Flottant Global (FAB) -->
+  <button mat-fab color="primary" class="assistant-fab shadow-lg" (click)="togglePanel()"
+          [matTooltip]="isOpen() ? 'Réduire l\'assistant' : 'Ouvrir l\'assistant vocal CollectPro'"
+          [class.active]="isOpen()"
+          [class.speaking]="state() === 'SPEAKING'"
+          [class.listening]="state() === 'LISTENING'">
+    <mat-icon class="fab-icon" *ngIf="!isOpen()">record_voice_over</mat-icon>
+    <mat-icon class="fab-icon" *ngIf="isOpen()">expand_more</mat-icon>
+    <span class="fab-ring" *ngIf="state() === 'LISTENING' || state() === 'SPEAKING'"></span>
+  </button>
+
+</div>

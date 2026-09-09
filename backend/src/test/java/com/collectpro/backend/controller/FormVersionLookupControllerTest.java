@@ -62,7 +62,7 @@ class FormVersionLookupControllerTest {
     @BeforeEach
     void setUp() {
         Organization organization = Organization.builder().id(1L).name("Org").build();
-        Role agentRole = Role.builder().id(5L).name(RoleType.AGENT_TERRAIN).build();
+        Role agentRole = Role.builder().id(5L).name(RoleType.AGENT).build();
 
         agentUser = User.builder()
                 .id(1L)

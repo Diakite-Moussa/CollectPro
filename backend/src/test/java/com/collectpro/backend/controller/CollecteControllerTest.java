@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -105,12 +106,12 @@ class CollecteControllerTest {
                 .dataJson("{\"key\":\"val\"}")
                 .build();
 
-        when(collecteService.getPendingValidationForSupervisor(any())).thenReturn(List.of(resp));
+        when(collecteService.getPendingValidationForSupervisor(any(), any())).thenReturn(new PageImpl<>(List.of(resp)));
 
         mockMvc.perform(get("/collectes/team/pending-validation").principal(authPrincipal))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(100))
-                .andExpect(jsonPath("$[0].status").value("PENDING_VALIDATION"));
+                .andExpect(jsonPath("$.content[0].id").value(100))
+                .andExpect(jsonPath("$.content[0].status").value("PENDING_VALIDATION"));
     }
 
     @Test

@@ -9,6 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
 import { AuthService } from '../../core/services/auth.service';
 import { ROUTE_ROLES } from '../../core/constants/route-roles';
+import { VoiceAssistantComponent } from '../assistant/voice-assistant.component';
 
 @Component({
   selector: 'app-main-layout',
@@ -21,7 +22,8 @@ import { ROUTE_ROLES } from '../../core/constants/route-roles';
     MatListModule,
     MatIconModule,
     MatButtonModule,
-    MatMenuModule
+    MatMenuModule,
+    VoiceAssistantComponent
   ],
   template: `
     <div class="layout-container">
@@ -101,6 +103,7 @@ import { ROUTE_ROLES } from '../../core/constants/route-roles';
 
         <mat-sidenav-content class="main-content">
           <router-outlet></router-outlet>
+          <app-voice-assistant></app-voice-assistant>
         </mat-sidenav-content>
       </mat-sidenav-container>
     </div>

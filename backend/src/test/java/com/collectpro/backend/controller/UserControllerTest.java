@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -109,12 +110,12 @@ class UserControllerTest {
                 .lastName("Un")
                 .build();
 
-        when(userService.getUsers(any())).thenReturn(List.of(uResp));
+        when(userService.getUsers(any(), any())).thenReturn(new PageImpl<>(List.of(uResp)));
 
         mockMvc.perform(get("/users").principal(authPrincipal))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(10))
-                .andExpect(jsonPath("$[0].email").value("agent@test.com"));
+                .andExpect(jsonPath("$.content[0].id").value(10))
+                .andExpect(jsonPath("$.content[0].email").value("agent@test.com"));
     }
 
     @Test
