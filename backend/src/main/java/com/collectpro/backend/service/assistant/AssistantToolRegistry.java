@@ -402,7 +402,8 @@ public class AssistantToolRegistry {
                                 "properties", Map.of(
                                         "page", Map.of(
                                                 "type", "string",
-                                                "description", "Page demandée : 'dashboard' (ou 'accueil'), 'missions', 'collectes', 'users' (ou 'utilisateurs'), 'forms' (ou 'formulaires'), 'audit-logs' (ou 'audit'), 'sync-logs' (ou 'synchronisations'), 'profile' (ou 'profil')."
+                                                "enum", List.of("dashboard", "organizations", "users", "forms", "collectes", "missions", "sync-logs", "audit-logs", "profile"),
+                                                "description", "Identifiant exact de la page cible parmi : 'dashboard', 'organizations', 'users', 'forms', 'collectes', 'missions', 'sync-logs', 'audit-logs', 'profile'."
                                         )
                                 ),
                                 "required", List.of("page")
@@ -416,13 +417,18 @@ public class AssistantToolRegistry {
                 .type("function")
                 .function(OllamaFunctionDefinition.builder()
                         .name("exporter_collectes")
-                        .description("Exporte et télécharge les données de collecte au format Excel (.xlsx) ou CSV.")
+                        .description("Exporte et télécharge les données de collecte au format Excel (.xlsx) ou CSV, avec filtre optionnel par mission.")
                         .parameters(Map.of(
                                 "type", "object",
                                 "properties", Map.of(
                                         "format", Map.of(
                                                 "type", "string",
+                                                "enum", List.of("excel", "csv"),
                                                 "description", "Format de fichier souhaité : 'excel' (défaut) ou 'csv'."
+                                        ),
+                                        "mission_name", Map.of(
+                                                "type", "string",
+                                                "description", "Nom ou intitulé optionnel de la mission pour laquelle exporter les collectes."
                                         )
                                 )
                         ))

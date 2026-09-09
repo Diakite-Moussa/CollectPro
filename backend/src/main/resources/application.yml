@@ -77,3 +77,6 @@ app:
     model: ${OLLAMA_MODEL:qwen3:8b}
     timeout-seconds: ${OLLAMA_TIMEOUT_SECONDS:300}
     api-key: ${OLLAMA_API_KEY:6b3d918df1394e1c9817fa0de9b1e43b.iizvFhsc2b0Brlj6OFLq5Gfd}
+
+  assistant:
+    enable-history: ${ASSISTANT_ENABLE_HISTORY:false}

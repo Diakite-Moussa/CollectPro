@@ -446,13 +446,17 @@ class AssistantToolExecutorTest {
     @Test
     @DisplayName("naviguer_page renvoie la route et le nom de page appropriés")
     void testNaviguerPageSuccess() {
-        String jsonMissions = toolExecutor.execute("naviguer_page", Map.of("page", "missions"), agent);
+        String jsonMissions = toolExecutor.execute("naviguer_page", Map.of("page", "missions"), supervisor);
         assertTrue(jsonMissions.contains("/missions"));
         assertTrue(jsonMissions.contains("Missions"));
 
-        String jsonUsers = toolExecutor.execute("naviguer_page", Map.of("page", "utilisateurs"), supervisor);
+        String jsonUsers = toolExecutor.execute("naviguer_page", Map.of("page", "utilisateurs"), admin);
         assertTrue(jsonUsers.contains("/users"));
         assertTrue(jsonUsers.contains("Gestion des Utilisateurs"));
+
+        String jsonDashboard = toolExecutor.execute("naviguer_page", Map.of("page", "dashboard"), agent);
+        assertTrue(jsonDashboard.contains("/dashboard"));
+        assertTrue(jsonDashboard.contains("Tableau de bord"));
 
         String jsonUnknown = toolExecutor.execute("naviguer_page", Map.of("page", "introuvable"), agent);
         assertTrue(jsonUnknown.contains("non reconnue"));
@@ -522,7 +526,7 @@ class AssistantToolExecutorTest {
                 .name("Recensement 2026")
                 .status(MissionStatus.ACTIVE)
                 .build();
-        when(missionService.updateMission(eq(300L), any(), eq(supervisor))).thenReturn(updated);
+        when(missionService.activateMission(300L, supervisor)).thenReturn(updated);
 
         String confirmedJson = toolExecutor.executeConfirmed(action, supervisor);
         assertTrue(confirmedJson.contains("ACTIVE"));
@@ -543,6 +547,40 @@ class AssistantToolExecutorTest {
         String json = toolExecutor.execute("changer_statut_mission",
                 Map.of("mission_name", "Mission Test", "action", "cloturer"), supervisor);
         assertTrue(json.contains("Transition impossible"));
+    }
+
+    @Test
+    @DisplayName("naviguer_page : autorisé pour un rôle ayant accès et bloqué pour un rôle non autorisé")
+    void testNaviguerPageRbac() {
+        // Superviseur vers missions (autorisé)
+        String jsonOk = toolExecutor.execute("naviguer_page", Map.of("page", "missions"), supervisor);
+        assertTrue(jsonOk.contains("success"));
+        assertTrue(jsonOk.contains("/missions"));
+
+        // Agent vers users (interdit)
+        User agent = User.builder()
+                .id(99L)
+                .email("agent@collectpro.org")
+                .role(Role.builder().name(RoleType.AGENT).build())
+                .organization(organization)
+                .build();
+        String jsonForbidden = toolExecutor.execute("naviguer_page", Map.of("page", "users"), agent);
+        assertTrue(jsonForbidden.contains("Accès refusé"));
+    }
+
+    @Test
+    @DisplayName("exporter_collectes : supporte le filtre mission_name et format csv")
+    void testExporterCollectesWithMission() {
+        when(permissionService.hasPermission(supervisor, "VIEW_COLLECTE")).thenReturn(true);
+        MissionResponse m = MissionResponse.builder().id(250L).name("Campagne Polio").build();
+        when(missionService.getMissionsForOrganization(organization)).thenReturn(List.of(m));
+        when(missionService.getMission(250L, supervisor)).thenReturn(m);
+
+        String json = toolExecutor.execute("exporter_collectes",
+                Map.of("format", "csv", "mission_name", "Polio"), supervisor);
+        assertTrue(json.contains("success"));
+        assertTrue(json.contains("csv"));
+        assertTrue(json.contains("250"));
     }
 }
 

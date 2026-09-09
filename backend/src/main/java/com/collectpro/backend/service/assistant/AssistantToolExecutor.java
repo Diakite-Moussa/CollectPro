@@ -55,6 +55,16 @@ public class AssistantToolExecutor {
     private final AuditLogQueryService auditLogQueryService;
     private final SyncLogService syncLogService;
 
+    private static final Map<String, Set<RoleType>> ROUTE_ROLES = Map.of(
+            "organizations", Set.of(RoleType.SUPER_ADMIN),
+            "users", Set.of(RoleType.SUPER_ADMIN, RoleType.ADMIN_PRINCIPAL, RoleType.ADMIN_SECONDAIRE),
+            "forms", Set.of(RoleType.ADMIN_PRINCIPAL, RoleType.ADMIN_SECONDAIRE),
+            "collectes", Set.of(RoleType.ADMIN_PRINCIPAL, RoleType.ADMIN_SECONDAIRE, RoleType.SUPERVISOR),
+            "audit-logs", Set.of(RoleType.SUPER_ADMIN, RoleType.ADMIN_PRINCIPAL, RoleType.ADMIN_SECONDAIRE),
+            "sync-logs", Set.of(RoleType.SUPER_ADMIN, RoleType.ADMIN_PRINCIPAL, RoleType.ADMIN_SECONDAIRE, RoleType.SUPERVISOR),
+            "missions", Set.of(RoleType.ADMIN_PRINCIPAL, RoleType.ADMIN_SECONDAIRE, RoleType.SUPERVISOR)
+    );
+
     public String execute(String toolName, Map<String, Object> arguments, User actor) {
         log.info("Exécution du tool IA '{}' par l'utilisateur '{}' (rôle: {})",
                 toolName, actor.getEmail(), actor.getRole().getName());
@@ -79,7 +89,7 @@ public class AssistantToolExecutor {
                 case "creer_utilisateur" -> executePrepareCreerUtilisateur(safeArgs, actor);
                 case "supprimer_utilisateur" -> executePrepareSupprimerUtilisateur(safeArgs, actor);
                 case "affecter_agent_superviseur" -> executePrepareAffecterAgentSuperviseur(safeArgs, actor);
-                case "naviguer_page" -> executeNaviguerPage(safeArgs);
+                case "naviguer_page" -> executeNaviguerPage(safeArgs, actor);
                 case "exporter_collectes" -> executeExporterCollectes(safeArgs, actor);
                 default -> Map.of("error", "Outil non reconnu : " + toolName);
             };
@@ -381,18 +391,25 @@ public class AssistantToolExecutor {
                 case "changer_statut_mission" -> {
                     Long missionId = extractLong(action.arguments().get("mission_id"));
                     MissionStatus targetStatus = MissionStatus.valueOf((String) action.arguments().get("target_status"));
-                    MissionResponse existing = missionService.getMission(missionId, actor);
-                    UpdateMissionRequest req = new UpdateMissionRequest();
-                    req.setName(existing.getName());
-                    req.setDescription(existing.getDescription());
-                    req.setStartDate(existing.getStartDate());
-                    req.setEndDate(existing.getEndDate());
-                    req.setLatitude(existing.getLatitude());
-                    req.setLongitude(existing.getLongitude());
-                    req.setRadiusMeters(existing.getRadiusMeters());
-                    req.setExpectedCollectesCount(existing.getExpectedCollectesCount());
-                    req.setStatus(targetStatus);
-                    MissionResponse response = missionService.updateMission(missionId, req, actor);
+                    MissionResponse response = switch (targetStatus) {
+                        case ACTIVE -> missionService.activateMission(missionId, actor);
+                        case CANCELLED -> missionService.cancelMission(missionId, actor);
+                        case COMPLETED -> missionService.completeMission(missionId, actor);
+                        default -> {
+                            MissionResponse existing = missionService.getMission(missionId, actor);
+                            UpdateMissionRequest req = new UpdateMissionRequest();
+                            req.setName(existing.getName());
+                            req.setDescription(existing.getDescription());
+                            req.setStartDate(existing.getStartDate());
+                            req.setEndDate(existing.getEndDate());
+                            req.setLatitude(existing.getLatitude());
+                            req.setLongitude(existing.getLongitude());
+                            req.setRadiusMeters(existing.getRadiusMeters());
+                            req.setExpectedCollectesCount(existing.getExpectedCollectesCount());
+                            req.setStatus(targetStatus);
+                            yield missionService.updateMission(missionId, req, actor);
+                        }
+                    };
                     yield Map.of("statut", "exécuté", "mission_id", response.getId(), "nom", response.getName(),
                             "nouveau_statut", response.getStatus().name(),
                             "message", "La mission '" + response.getName() + "' est désormais en statut " + response.getStatus().name());
@@ -787,45 +804,62 @@ public class AssistantToolExecutor {
         );
     }
 
-    private Object executeNaviguerPage(Map<String, Object> args) {
+    private Object executeNaviguerPage(Map<String, Object> args, User actor) {
         String pageRaw = (String) args.get("page");
         if (pageRaw == null || pageRaw.isBlank()) {
             return Map.of("error", "Veuillez spécifier la page vers laquelle vous souhaitez naviguer.");
         }
 
         String page = pageRaw.toLowerCase().trim();
+        String routeKey;
         String route;
         String pageName;
 
         if (page.contains("dash") || page.contains("accueil") || page.contains("tableau") || page.contains("bord")) {
+            routeKey = "dashboard";
             route = "/dashboard";
             pageName = "Tableau de bord";
         } else if (page.contains("mission")) {
+            routeKey = "missions";
             route = "/missions";
             pageName = "Missions";
         } else if (page.contains("collecte")) {
+            routeKey = "collectes";
             route = "/collectes";
             pageName = "Collectes";
         } else if (page.contains("user") || page.contains("utilisat") || page.contains("equipe") || page.contains("membre")) {
+            routeKey = "users";
             route = "/users";
             pageName = "Gestion des Utilisateurs";
         } else if (page.contains("form") || page.contains("questionnaire")) {
+            routeKey = "forms";
             route = "/forms";
             pageName = "Formulaires";
         } else if (page.contains("audit") || page.contains("journal")) {
+            routeKey = "audit-logs";
             route = "/audit-logs";
             pageName = "Journal d'audit";
         } else if (page.contains("sync") || page.contains("synchronis")) {
+            routeKey = "sync-logs";
             route = "/sync-logs";
             pageName = "Synchronisations";
         } else if (page.contains("organis") || page.contains("entreprise")) {
+            routeKey = "organizations";
             route = "/organizations";
             pageName = "Organisations";
         } else if (page.contains("profil") || page.contains("profile") || page.contains("compte")) {
+            routeKey = "profile";
             route = "/profile";
             pageName = "Mon Profil";
         } else {
-            return Map.of("error", "Page '" + pageRaw + "' non reconnue. Les pages disponibles sont : Accueil/Dashboard, Missions, Collectes, Utilisateurs, Formulaires, Audit, Synchronisations, Organisations, Profil.");
+            return Map.of("error", "Page '" + pageRaw + "' non reconnue. Les pages autorisées sont : dashboard, organizations, users, forms, collectes, missions, sync-logs, audit-logs, profile.");
+        }
+
+        RoleType userRole = (actor.getRole() != null) ? actor.getRole().getName() : null;
+        Set<RoleType> allowedRoles = ROUTE_ROLES.get(routeKey);
+        if (allowedRoles != null && (userRole == null || !allowedRoles.contains(userRole))) {
+            return Map.of("error", "Accès refusé : votre rôle (" + (userRole != null ? userRole.name() : "non défini")
+                    + ") ne vous permet pas d'accéder à la page '" + pageName + "'.");
         }
 
         return Map.of(
@@ -844,11 +878,29 @@ public class AssistantToolExecutor {
         String formatRaw = (String) args.get("format");
         String format = (formatRaw != null && formatRaw.toLowerCase().contains("csv")) ? "csv" : "excel";
 
-        return Map.of(
-                "status", "success",
-                "format", format,
-                "message", "Export des collectes prêt au téléchargement au format " + ("excel".equals(format) ? "Excel (.xlsx)" : "CSV (.csv)") + "."
-        );
+        String missionName = extractString(args.get("mission_name"), args.get("mission"));
+        Long missionId = null;
+        String missionLabel = "";
+        if (missionName != null && !missionName.isBlank()) {
+            missionId = resolveMissionIdByName(missionName, actor);
+            if (missionId != null) {
+                try {
+                    MissionResponse m = missionService.getMission(missionId, actor);
+                    missionLabel = " pour la mission '" + m.getName() + "'";
+                } catch (Exception ignored) {
+                }
+            }
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("status", "success");
+        result.put("format", format);
+        if (missionId != null) {
+            result.put("mission_id", missionId);
+        }
+        result.put("message", "Export des collectes" + missionLabel + " prêt au téléchargement au format "
+                + ("excel".equals(format) ? "Excel (.xlsx)" : "CSV (.csv)") + ".");
+        return result;
     }
 
     private Object executePrepareGenererRapportMission(Map<String, Object> args, User actor) {

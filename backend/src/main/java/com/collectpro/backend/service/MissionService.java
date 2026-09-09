@@ -138,6 +138,48 @@ public class MissionService {
         return toResponse(mission);
     }
 
+    @Transactional
+    public MissionResponse activateMission(Long missionId, User actor) {
+        Mission mission = getMissionEntity(missionId);
+        assertSameOrganization(mission, actor);
+        assertValidTransition(mission.getStatus(), MissionStatus.ACTIVE);
+
+        mission.setStatus(MissionStatus.ACTIVE);
+        mission = missionRepository.save(mission);
+
+        auditLogService.log(
+                actor,
+                mission.getOrganization(),
+                AuditAction.MISSION_UPDATED,
+                "Mission",
+                mission.getId(),
+                "Activation de la mission '" + mission.getName() + "'"
+        );
+
+        return toResponse(mission);
+    }
+
+    @Transactional
+    public MissionResponse completeMission(Long missionId, User actor) {
+        Mission mission = getMissionEntity(missionId);
+        assertSameOrganization(mission, actor);
+        assertValidTransition(mission.getStatus(), MissionStatus.COMPLETED);
+
+        mission.setStatus(MissionStatus.COMPLETED);
+        mission = missionRepository.save(mission);
+
+        auditLogService.log(
+                actor,
+                mission.getOrganization(),
+                AuditAction.MISSION_UPDATED,
+                "Mission",
+                mission.getId(),
+                "Clôture de la mission '" + mission.getName() + "'"
+        );
+
+        return toResponse(mission);
+    }
+
     private void assertMissionAssignable(Mission mission) {
         if (mission.getStatus() == MissionStatus.COMPLETED || mission.getStatus() == MissionStatus.CANCELLED) {
             throw new BusinessRuleException(

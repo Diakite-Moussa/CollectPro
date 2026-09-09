@@ -9,7 +9,9 @@ import com.collectpro.backend.entity.User;
 import com.collectpro.backend.enums.AuditAction;
 import com.collectpro.backend.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -27,6 +29,10 @@ public class AssistantOrchestratorService {
     private final AssistantConfirmationService confirmationService;
     private final AuditLogService auditLogService;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+
+    @Value("${app.assistant.enable-history:${assistant.enable-history:false}}")
+    @Setter
+    private boolean enableHistory = false;
 
     public AssistantChatResponse chat(User principal, AssistantChatRequest request) {
         try {
@@ -164,7 +170,7 @@ public class AssistantOrchestratorService {
         List<OllamaMessage> messages = new ArrayList<>();
         messages.add(new OllamaMessage("system", systemPrompt));
 
-        if (request.getHistory() != null && !request.getHistory().isEmpty()) {
+        if (enableHistory && request.getHistory() != null && !request.getHistory().isEmpty()) {
             int start = Math.max(0, request.getHistory().size() - 6);
             for (int i = start; i < request.getHistory().size(); i++) {
                 AssistantChatRequest.HistoryMessage item = request.getHistory().get(i);
